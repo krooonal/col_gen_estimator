@@ -1,3 +1,5 @@
 TODO
 
-Initial repository
+Initial repository.
+
+First code review.
