@@ -317,4 +317,6 @@ sphinx_gallery_conf = {
 
 def setup(app):
     # a copy button to copy snippet of code from the documentation
-    app.add_javascript('js/copybutton.js')
+    # TODO(krunal): Fix this
+    # app.add_javascript('js/copybutton.js')
+    pass
