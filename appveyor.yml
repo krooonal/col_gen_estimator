@@ -5,9 +5,9 @@ environment:
     - PYTHON: "C:\\Miniconda3-x64"
       PYTHON_VERSION: "3.5.x"
       PYTHON_ARCH: "32"
-      NUMPY_VERSION: "1.13.1"
-      SCIPY_VERSION: "0.19.1"
-      SKLEARN_VERSION: "0.19.1"
+      NUMPY_VERSION: "*"
+      SCIPY_VERSION: "*"
+      SKLEARN_VERSION: "*"
 
     - PYTHON: "C:\\Miniconda3-x64"
       PYTHON_VERSION: "3.6.x"
