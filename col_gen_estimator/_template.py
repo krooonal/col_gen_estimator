@@ -21,7 +21,7 @@ class TemplateEstimator(BaseEstimator):
 
     Examples
     --------
-    >>> from skltemplate import TemplateEstimator
+    >>> from col_gen_estimator import TemplateEstimator
     >>> import numpy as np
     >>> X = np.arange(100).reshape(100, 1)
     >>> y = np.zeros((100, ))
