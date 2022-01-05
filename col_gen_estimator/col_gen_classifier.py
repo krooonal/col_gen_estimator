@@ -70,11 +70,21 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
     classes_ : ndarray, shape (n_classes,)
         The classes seen at :meth:`fit`.
     """
-    def __init__(self, max_iterations='-1', master_problem = BaseMasterProblem(), subproblem = BaseSubproblem()):
+    def __init__(self, max_iterations='-1', 
+            master_problem = BaseMasterProblem(), 
+            subproblem = BaseSubproblem(),
+            rmp_is_ip = False,
+            rmp_solver_params = "", 
+            master_ip_solver_params = "",
+            subproblem_params = ""):
         self.max_iterations = max_iterations
         self.master_problem = master_problem
         self.subproblem = subproblem
-
+        self.rmp_is_ip = rmp_is_ip
+        self.rmp_solver_params = rmp_solver_params
+        self.master_ip_solver_params = master_ip_solver_params
+        self.subproblem_params = subproblem_params
+        
     def fit(self, X, y):
         """Runs the column generation loop.
 
@@ -98,7 +108,28 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         self.X_ = X
         self.y_ = y
 
-        # TODO: Col generation loop.
+        # Initiate the master and subproblems
+        self.master_problem.generate_mp(X, y, params=None) 
+
+        for iter in range(self.max_iterations):
+            # Solve RMIP
+            dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
+
+            generated_columns = self.subproblem.generate_columns(X,y,dual_costs,self.subproblem_params)
+
+            rmp_updated = False
+            for column in generated_columns:
+                rmp_updated = self.master_problem.add_column(column)
+            
+            if not rmp_updated:
+                print("RMIP not updated. exiting the loop.")
+                break
+        
+        if self.rmp_is_ip:
+            solved = self.master_problem.solve_ip(self.master_ip_solver_params)
+            if not solved:
+                print("RMP integer program couldn't be solved.")
+
         # Return the classifier
         return self
 
