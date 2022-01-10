@@ -70,7 +70,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
     classes_ : ndarray, shape (n_classes,)
         The classes seen at :meth:`fit`.
     """
-    def __init__(self, max_iterations='-1', 
+    def __init__(self, max_iterations=-1, 
             master_problem = BaseMasterProblem(), 
             subproblem = BaseSubproblem(),
             rmp_is_ip = False,
@@ -130,6 +130,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
             if not solved:
                 print("RMP integer program couldn't be solved.")
 
+        self.is_fitted_ = True
         # Return the classifier
         return self
 

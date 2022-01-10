@@ -6,7 +6,10 @@ import numpy as np
 from bitarray.util import int2ba
 from ortools.linear_solver import pywraplp
 from ortools.linear_solver import linear_solver_pb2
-from col_gen_classifier import ColGenClassifier, BaseMasterProblem, BaseSubProblem
+from sklearn.utils.validation import check_array, check_is_fitted
+from ._col_gen_classifier import BaseMasterProblem
+from ._col_gen_classifier import BaseSubproblem
+from ._col_gen_classifier import ColGenClassifier
 
 class BDRMasterProblem(BaseMasterProblem):
     """ TODO
@@ -33,12 +36,14 @@ class BDRMasterProblem(BaseMasterProblem):
     def generate_mp(self,X,y,params):
         """ Generates the master problem model (RMP) and initializes the primal and dual solutions.
         """
+        if self.generated:
+            return
         self.X = X
         self.y = y
         infinity = self.solver.infinity()
         self.solver.SetNumThreads(1)
         
-        n_positive_examples = int(sum(y))
+        n_positive_examples = len(list(filter(lambda x: (x > 0), y)))
         
         n_clauses = 1 # Initial number of clasuses to start with.
         
@@ -151,6 +156,7 @@ class BDRMasterProblem(BaseMasterProblem):
             return
         # We can use sat here since all the coefficients and variables are integer. 
         # We can also use gurobi. But sat is 2-3 times faster.
+        # TODO: Solver type should be a parameter.
         solver = pywraplp.Solver.CreateSolver("sat") 
         
         # We have to load the model from LP solver. This copy is not avoidable with OR-Tools.
@@ -160,17 +166,16 @@ class BDRMasterProblem(BaseMasterProblem):
         
         num_xi_vars = len(self.xi_vars)
         solver.SetTimeLimit(30000)
-        result_status = solver.Solve(solver_params)
+
+        result_status = solver.Solve(self.get_params(solver_params))
         print('Problem solved in %f milliseconds' % solver.wall_time())
         self.explanation = []
         
-        n_positive_examples = int(sum(self.y))
-        n_samples = self.X.shape[0]
-        n_zero_examples = n_samples - n_positive_examples
         if result_status != pywraplp.Solver.OPTIMAL and result_status != pywraplp.Solver.FEASIBLE:
             return False
         print("Objective = ", solver.Objective().Value())
         all_vars = solver.variables()
+        assert(len(all_vars) == num_xi_vars + len(self.clause_vars))
         num_unsatisfied_positives = 0
         for i in range(len(all_vars)):
             if i < num_xi_vars:
@@ -182,9 +187,17 @@ class BDRMasterProblem(BaseMasterProblem):
                     " ", self.clause_dict[orig_var])
                 self.explanation.append(self.clause_dict[orig_var])
         return True
+    
+    @staticmethod
+    def get_params(params):
+        """ Given the params in string form, returns the MPSolverParameters."""
+        # TODO: Implement this method.
+        solver_params = pywraplp.MPSolverParameters()
+        print(params)
+        return solver_params
 
     @staticmethod
-    def SatisfiesDNF(self, entry, clause):
+    def SatisfiesDNF(entry, clause):
         """ Given the entry and clause, check if the entry satisfies the clause
         """
         for index in clause:
@@ -205,7 +218,6 @@ class BDRMasterProblem(BaseMasterProblem):
             num_entries_satisfying_clause += self.SatisfiesDNF(entry, clause)
         return num_entries_satisfying_clause
 
-    # Function: 
     def GetCoefficientsForClause(self, clause):
         """ Given the clause, returns its coefficients
         """
@@ -231,7 +243,7 @@ class BDRMasterProblem(BaseMasterProblem):
         clause = [i for i in range(len(ind)) if ind[i]]
         return clause
 
-class BDRSubProblem(BaseSubProblem):
+class BDRSubProblem(BaseSubproblem):
     """ Base class for subproblem. One needs to extend this for using with ColGenClassifier.
     """
 
@@ -363,7 +375,7 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
 
     Parameters
     ----------
-    max_iterations : int, default='-1'
+    max_iterations : int, default=-1
         Maximum column generation iterations. Negative values removes the iteration limit and the problem
         is solved till optimality.
     TODO: Documentation for C,P
@@ -378,19 +390,21 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
     classes_ : ndarray, shape (n_classes,)
         The classes seen at :meth:`fit`.
     """
-    def __init__(self, max_iterations='-1', 
+    def __init__(self, max_iterations=-1, 
             C=10, 
             P=10,
             rmp_solver_params = "", 
             master_ip_solver_params = "",
             subproblem_params = ""):
         super(BooleanDecisionRuleClassifier, self).__init__(max_iterations, 
-            master_problem = BDRMasterProblem(C, P), 
+            master_problem = BDRMasterProblem(C, P, 'cbc'), 
             subproblem = BDRSubProblem(C),
             rmp_is_ip = True,
             rmp_solver_params = rmp_solver_params, 
             master_ip_solver_params = master_ip_solver_params,
             subproblem_params = subproblem_params)
+        self.C = C
+        self.P = P
 
     def predict(self, X):
         """ Predicts the class based on the solution of master problem. This method is abstract.
@@ -405,6 +419,8 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
         y : ndarray, shape (n_samples,)
             The label for each sample.
         """
+        X = check_array(X, accept_sparse=True)
+        check_is_fitted(self, 'is_fitted_')
         explanation = self.master_problem.explanation
         # Check if the input satisfies any of the clause in explanation.
         y_predict = np.zeros(X.shape[0])

@@ -25,9 +25,9 @@ class TemplateEstimator(BaseEstimator):
     >>> import numpy as np
     >>> X = np.arange(100).reshape(100, 1)
     >>> y = np.zeros((100, ))
-    >>> estimator = TemplateEstimator()
+    >>> estimator = TemplateEstimator(demo_param='demo_param')
     >>> estimator.fit(X, y)
-    TemplateEstimator()
+    TemplateEstimator(demo_param='demo_param')
     """
     def __init__(self, demo_param='demo_param'):
         self.demo_param = demo_param
