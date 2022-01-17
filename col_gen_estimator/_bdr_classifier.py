@@ -11,6 +11,56 @@ from ._col_gen_classifier import BaseMasterProblem
 from ._col_gen_classifier import BaseSubproblem
 from ._col_gen_classifier import ColGenClassifier
 
+class SerializableMPSolver:
+    """ Wrapper on MPSolver that is serializable.
+    """
+    def __init__(self, optimization_problem_type):
+        self.optimization_problem_type = optimization_problem_type
+        self.solver = pywraplp.Solver.CreateSolver(optimization_problem_type)
+    
+    def infinity(self):
+        return self.solver.infinity()
+    def SetNumThreads(self, num):
+        return self.solver.SetNumThreads(num)
+    def Objective(self):
+        return self.solver.Objective()
+    def IntVar(self, lb, ub, name):
+        return self.solver.IntVar(lb,ub,name)
+    def BoolVar(self, name):
+        return self.solver.BoolVar(name)
+    def Constraint(self, lb, ub, name):
+        return self.solver.Constraint(lb,ub,name)
+    def NumConstraints(self):
+        return self.solver.NumConstraints()
+    def NumVariables(self):
+        return self.solver.NumVariables()
+    def Solve(self, params):
+        return self.solver.Solve(params)
+    def ExportModelToProto(self, model_proto):
+        return self.solver.ExportModelToProto(model_proto)
+    def LoadModelFromProto(self, model_proto):
+        return self.solver.LoadModelFromProto(model_proto)
+    def variable(self, index):
+        return self.solver.variable(index)
+    def constraint(self, index):
+        return self.solver.constraint(index)
+    def variables(self):
+        return self.solver.variables()
+    def constraints(self):
+        return self.solver.constraints()
+    
+    def __getstate__(self):
+        model_proto = linear_solver_pb2.MPModelProto()
+        self.solver.ExportModelToProto(model_proto)
+        return [model_proto, self.optimization_problem_type]
+
+    def __setstate__(self,state):
+        print("Called __setstate__")
+        model_proto = state[0]
+        self.optimization_problem_type = state[1]
+        self.solver = pywraplp.Solver.CreateSolver(self.optimization_problem_type)
+        self.solver.LoadModelFromProto(model_proto)
+
 class BDRMasterProblem(BaseMasterProblem):
     """ TODO
     """
@@ -21,7 +71,7 @@ class BDRMasterProblem(BaseMasterProblem):
         self.generated = False
         self.C = C
         self.P = P
-        self.solver = pywraplp.Solver.CreateSolver(optimization_problem_type)
+        self.solver = SerializableMPSolver(optimization_problem_type)
     
         # Vars
         self.clause_vars = None
@@ -43,7 +93,7 @@ class BDRMasterProblem(BaseMasterProblem):
         infinity = self.solver.infinity()
         self.solver.SetNumThreads(1)
         
-        n_positive_examples = len(list(filter(lambda x: (x > 0), y)))
+        n_positive_examples = len(list(filter(lambda x: (isinstance(x, int) and x > 0), y)))
         
         n_clauses = 1 # Initial number of clasuses to start with.
         
@@ -53,32 +103,37 @@ class BDRMasterProblem(BaseMasterProblem):
         # Add objective coeff
         for i in range(n_positive_examples):
             # This need not be a boolean variable. It doesn't it need the upper bound.
-            self.xi_vars[i] = self.solver.IntVar(0.0, infinity, 'p_'+str(i))
+            xi_var = self.solver.IntVar(0.0, infinity, 'p_'+str(i))
+            self.xi_vars[i] = xi_var.index()
             # Regular objective coefficient here is 1. But we can try different weights.
-            objective.SetCoefficient(self.xi_vars[i], self.P)
+            objective.SetCoefficient(xi_var, self.P)
         
         self.clause_vars = [None]*n_clauses
         for i in range(n_clauses):
-            self.clause_vars[i] = self.solver.IntVar(0.0,infinity,'c_'+str(i))
-            clause_var = self.clause_vars[i]
+            clause_var = self.solver.IntVar(0.0,infinity,'c_'+str(i))
+            self.clause_vars[i] = clause_var.index()
             clause = self.GetClauseFromVarInd(i)
-            self.clause_dict[clause_var] = clause
+            self.clause_dict[self.clause_vars[i]] = clause
             obj_coeff = self.GetObjectiveCoeffMP(clause)
             objective.SetCoefficient(clause_var, obj_coeff)
         objective.SetMinimization()
 
         # Add constraints
         self.clause_satisfaction = [None]*n_positive_examples
-        self.clause_complexity = self.solver.Constraint(-infinity, self.C, "clause_complexity")
+        clause_satisfaction_cons = [None]*n_positive_examples
+        clause_complexity_cons = self.solver.Constraint(-infinity, self.C, "clause_complexity")
+        self.clause_complexity = clause_complexity_cons.index()
         for i in range(n_positive_examples):
-            self.clause_satisfaction[i] = self.solver.Constraint(1, infinity, "clause_satisfaction_" + str(i))
-            self.clause_satisfaction[i].SetCoefficient(self.xi_vars[i] , 1)
+            clause_satisfaction_cons[i] = self.solver.Constraint(1, infinity, "clause_satisfaction_" + str(i))
+            self.clause_satisfaction[i] = clause_satisfaction_cons[i].index()
+            xi_var = self.solver.variable(self.xi_vars[i])
+            clause_satisfaction_cons[i].SetCoefficient(xi_var , 1)
         for i in range(n_clauses):
-            clause_var = self.clause_vars[i]
-            coeffs = self.GetCoefficientsForClause(self.clause_dict[clause_var])
+            clause_var = self.solver.variable(self.clause_vars[i])
+            coeffs = self.GetCoefficientsForClause(self.clause_dict[self.clause_vars[i]])
             for j in range(n_positive_examples):
-                self.clause_satisfaction[j].SetCoefficient(clause_var, coeffs[j])
-            self.clause_complexity.SetCoefficient(clause_var, coeffs[-1])
+                clause_satisfaction_cons[j].SetCoefficient(clause_var, coeffs[j])
+            clause_complexity_cons.SetCoefficient(clause_var, coeffs[-1])
         
         self.generated = True
 
@@ -98,22 +153,23 @@ class BDRMasterProblem(BaseMasterProblem):
         n_clauses = len(self.clause_vars)
         n_positive_examples = self.solver.NumConstraints() - 1
         clause_var = self.solver.IntVar(0.0,self.solver.infinity(),'c_'+str(n_clauses))
-        self.clause_vars.append(clause_var)
-        self.clause_dict[clause_var] = clause
+        self.clause_vars.append(clause_var.index())
+        self.clause_dict[clause_var.index()] = clause
         obj_coeff = self.GetObjectiveCoeffMP(clause)
         self.solver.Objective().SetCoefficient(clause_var, obj_coeff)
 
         # Constraint coeffs
         coeffs = self.GetCoefficientsForClause(clause)
-        assert(n_positive_examples == len(self.clause_satisfaction))
+        assert n_positive_examples == len(self.clause_satisfaction)
         for j in range(n_positive_examples):
-            self.clause_satisfaction[j].SetCoefficient(clause_var, coeffs[j])
-        self.clause_complexity.SetCoefficient(clause_var, coeffs[-1])
+            clause_satisfaction_cons = self.solver.constraint(self.clause_satisfaction[j])
+            clause_satisfaction_cons.SetCoefficient(clause_var, coeffs[j])
+        clause_comp_constraint = self.solver.constraint(self.clause_complexity)
+        clause_comp_constraint.SetCoefficient(clause_var, coeffs[-1])
 
         print("Added a column: ", clause_var.name(), " ", clause)
         return True
         
-
     def solve_rmp(self,solver_params):
         """ Solves the RMP with given solver params.
         """
@@ -125,27 +181,32 @@ class BDRMasterProblem(BaseMasterProblem):
         n_positive_examples = self.solver.NumConstraints() - 1
 
         # TODO: Hide this under optional logging flag.
-        print('LP Problem solved in %f milliseconds' % self.solver.wall_time())
+        # print('LP Problem solved in %f milliseconds' % self.solver.wall_time())
         print('Number of variables RMIP = %d' % self.solver.NumVariables())
         print('Number of constraints RMIP = %d' % self.solver.NumConstraints())
         if result_status == pywraplp.Solver.OPTIMAL:
+            # TODO: Record solution in class for proper pickle effect.
             print('Optimal objective value = %f' % self.solver.Objective().Value())
             num_unsatisfied_cons = 0
-            for xi in self.xi_vars:
+            for xi_index in self.xi_vars:
+                xi = self.solver.variable(xi_index)
                 if xi.solution_value() > 0:
                     num_unsatisfied_cons += 1
             print("Number of unsatisfied positives: ", num_unsatisfied_cons)
-            for cvar in self.clause_vars:
+            for cvar_index in self.clause_vars:
+                cvar = self.solver.variable(cvar_index)
                 if cvar.solution_value() > 0:
                     print(cvar.name(), " ", self.clause_dict[cvar],  " " , cvar.solution_value())
                 if cvar.ReducedCost() > 0:
                     print(cvar.name(), " ", self.clause_dict[cvar], " rc " , cvar.ReducedCost())
 
         # Dual costs
-        cc_dual = abs(self.clause_complexity.dual_value())
+        clause_comp_cons = self.solver.constraint(self.clause_complexity)
+        cc_dual = abs(clause_comp_cons.dual_value())
         cs_duals = []
         for i in range(n_positive_examples):
-            cs_duals.append(self.clause_satisfaction[i].dual_value())
+            clause_satisfaction_cons = self.solver.constraint(self.clause_satisfaction[i])
+            cs_duals.append(clause_satisfaction_cons.dual_value())
         return (cc_dual,cs_duals)
 
     def solve_ip(self,solver_params):
@@ -173,19 +234,20 @@ class BDRMasterProblem(BaseMasterProblem):
         
         if result_status != pywraplp.Solver.OPTIMAL and result_status != pywraplp.Solver.FEASIBLE:
             return False
+        # TODO: Store solution instead of printing it.
         print("Objective = ", solver.Objective().Value())
         all_vars = solver.variables()
-        assert(len(all_vars) == num_xi_vars + len(self.clause_vars))
+        assert len(all_vars) == num_xi_vars + len(self.clause_vars) 
         num_unsatisfied_positives = 0
         for i in range(len(all_vars)):
             if i < num_xi_vars:
                 if all_vars[i].solution_value() > 0:
                     num_unsatisfied_positives += 1
             elif all_vars[i].solution_value() > 0:
-                orig_var = self.clause_vars[i-num_xi_vars]
+                orig_var = self.solver.variable(self.clause_vars[i-num_xi_vars])
                 print(orig_var.name(),"=", all_vars[i].solution_value(), 
-                    " ", self.clause_dict[orig_var])
-                self.explanation.append(self.clause_dict[orig_var])
+                    " ", self.clause_dict[orig_var.index()])
+                self.explanation.append(self.clause_dict[orig_var.index()])
         return True
     
     @staticmethod
@@ -249,7 +311,7 @@ class BDRSubProblem(BaseSubproblem):
 
     def __init__(self, D):
         self.D = D
-        self.solver = None
+        self.solver = SerializableMPSolver('cbc')
         self.generated = False
     
         # Vars
@@ -257,21 +319,20 @@ class BDRSubProblem(BaseSubproblem):
         self.z_vars = None
     
     def create_submip(self, cc_dual, cs_duals):
-        self.solver = pywraplp.Solver.CreateSolver('gurobi')
-        assert(self.solver.SetSolverSpecificParametersAsString("Threads = 2"))
         infinity = self.solver.infinity()
 
         n_words = self.X.shape[1]
         n_samples = self.X.shape[0]
 
         # We assume the positive dual cost in this model.
-        assert(cc_dual >= 0, "Negative clause complexity dual")
+        assert cc_dual >= 0, "Negative clause complexity dual" 
 
         self.z_vars = [None]*n_words
         objective = self.solver.Objective()
         for i in range(n_words):
-            self.z_vars[i] = self.solver.BoolVar('z_'+str(i))
-            objective.SetCoefficient(self.z_vars[i], cc_dual)
+            z_var = self.solver.BoolVar('z_'+str(i))
+            self.z_vars[i] = z_var.index()
+            objective.SetCoefficient(z_var, cc_dual)
         
         self.delta_vars = [None]*n_samples
         # Add objective coeff
@@ -279,7 +340,8 @@ class BDRSubProblem(BaseSubproblem):
         n_zero_examples = 0
         for i in range(n_samples):
             # This need not be a boolean variable.
-            self.delta_vars[i] = self.solver.BoolVar('d_'+str(i))
+            delta_var = self.solver.BoolVar('d_'+str(i))
+            self.delta_vars[i] = delta_var.index()
             obj_coeff = 1
             target = self.y[i]
             if target == 1:
@@ -287,7 +349,7 @@ class BDRSubProblem(BaseSubproblem):
                 n_positive_examples += 1
             else:
                 n_zero_examples += 1
-            objective.SetCoefficient(self.delta_vars[i], obj_coeff)
+            objective.SetCoefficient(delta_var, obj_coeff)
 
         objective.SetOffset(cc_dual)
         objective.SetMinimization()
@@ -317,12 +379,13 @@ class BDRSubProblem(BaseSubproblem):
     def update_objective(self, cc_dual, cs_duals):
         """ Updates the objective of the generated subproblem.
         """
-        assert(self.generated, "Update objective called before generating the subproblem.")
+        assert self.generated, "Update objective called before generating the subproblem." 
         n_words = self.X.shape[1]
         n_samples = self.X.shape[0]
         objective = self.solver.Objective()
         for i in range(n_words):
-            objective.SetCoefficient(self.z_vars[i], cc_dual)
+            z_var = self.solver.variable(self.z_vars[i])
+            objective.SetCoefficient(z_var, cc_dual)
         
         n_positive_examples = 0
         n_zero_examples = 0
@@ -334,7 +397,8 @@ class BDRSubProblem(BaseSubproblem):
                 n_positive_examples += 1
             else:
                 n_zero_examples += 1
-            objective.SetCoefficient(self.delta_vars[i], obj_coeff)
+            delta_var = self.solver.variable(self.delta_vars[i])
+            objective.SetCoefficient(delta_var, obj_coeff)
 
         objective.SetOffset(cc_dual)
         objective.SetMinimization()
@@ -365,7 +429,8 @@ class BDRSubProblem(BaseSubproblem):
         # TODO: This threshold should be a parameter.
         if self.solver.Objective().Value() < -1e-6:
             for i in range(len(self.z_vars)):
-                if self.z_vars[i].solution_value() > 0:
+                z_var = self.solver.variable(self.z_vars[i])
+                if z_var.solution_value() > 0:
                     clause.append(i)
 
         return [clause]
@@ -405,6 +470,11 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
             subproblem_params = subproblem_params)
         self.C = C
         self.P = P
+    
+    def _more_tags(self):
+        return {'X_types': ['categorical'],
+                'non_deterministic': True,
+                'binary_only': True}
 
     def predict(self, X):
         """ Predicts the class based on the solution of master problem. This method is abstract.
@@ -423,11 +493,11 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
         check_is_fitted(self, 'is_fitted_')
         explanation = self.master_problem.explanation
         # Check if the input satisfies any of the clause in explanation.
-        y_predict = np.zeros(X.shape[0])
+        y_predict = np.zeros(X.shape[0], dtype=int)
         for i in range(X.shape[0]):
             for clause in explanation:
                 if self.master_problem.SatisfiesDNF(X[i], clause):
                     y_predict[i] = 1
                     break
-        return y_predict
+        return self.label_encoder.inverse_transform(y_predict)
 

@@ -7,6 +7,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.utils.multiclass import unique_labels
 from sklearn.metrics import euclidean_distances
+from sklearn.preprocessing import LabelEncoder
 
 class BaseMasterProblem():
     """ Base class for master problem. One needs to extend this for using with ColGenClassifier.
@@ -107,15 +108,22 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
 
         self.X_ = X
         self.y_ = y
+        self.label_encoder = LabelEncoder()
+        self.processed_y_ = self.label_encoder.fit_transform(y)
+        # Store the classes seen during fit
+        self.classes_ = unique_labels(y)
+        if len(self.classes_) <= 1:
+            raise ValueError("Classifier can't train when only one class is present.")
 
         # Initiate the master and subproblems
-        self.master_problem.generate_mp(X, y, params=None) 
+        self.master_problem.generate_mp(X, self.processed_y_, params=None) 
 
         for iter in range(self.max_iterations):
             # Solve RMIP
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
 
-            generated_columns = self.subproblem.generate_columns(X,y,dual_costs,self.subproblem_params)
+            generated_columns = self.subproblem.generate_columns(X,self.processed_y_,
+                                        dual_costs,self.subproblem_params)
 
             rmp_updated = False
             for column in generated_columns:
