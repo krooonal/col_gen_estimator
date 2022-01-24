@@ -14,28 +14,45 @@ class BaseMasterProblem():
     """
 
     def __init__(self):
-        """ Initialize the master problem model.
-        TODO: Remove this ?
-        """
         pass
     
-    def generate_mp(self,X,y,params):
+    def generate_mp(self,X,y):
         """ Generates the master problem model (RMP) and initializes the primal and dual solutions.
+        Parameters
+        ----------
+        X : ndarray, shape (n_samples, n_features)
+            The input.
+        y : ndarray, shape (n_samples,)
+            The labels.
         """
         pass
 
     def add_column(self,column):
         """ Adds the given column to the master problem model.
+        Parameters
+        ----------
+        column : object,
+            The column to be added to the RMP.
         """
         pass
 
-    def solve_rmp(self,solver_params):
+    def solve_rmp(self,solver_params=''):
         """ Solves the RMP with given solver params.
+        Returns the dual costs.
+        Parameters
+        ----------
+        solver_params : string, default='',
+            The solver parameters for solving the RMP.
         """
         pass
 
-    def solve_ip(self,solver_params):
-        """ Solves the integer RMP with given solver params.
+    def solve_ip(self,solver_params=''):
+        """ Solves the integer RMP with given solver params. 
+        Returns false if the problem is not solved.
+        Parameters
+        ----------
+        solver_params : string, default='',
+            The solver parameters for solving the integer RMP.
         """
         pass
 
@@ -54,13 +71,19 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
 
     Parameters
     ----------
-    max_iterations : int, default='-1'
+    max_iterations : int, default=-1
         Maximum column generation iterations. Negative values removes the iteration limit and the problem
         is solved till optimality.
-    master_problem :
-        Instance of BaseMasterProblem.
-    subproblem : 
-        Instance of BaseSubproblem.
+    master_problem : Instance of BaseMasterProblem, default = BaseSubproblem()
+    subproblem : Instance of BaseSubproblem, default = BaseSubproblem()
+    rmp_is_ip : boolean, default = False
+        True if the master problem has integer variables.
+    rmp_solver_params: string, default = "",
+        Solver parameters for solving restricted master problem (rmp).
+    master_ip_solver_params: string, default = "",
+        Solver parameters for solving the integer master problem.
+    subproblem_params: string, default = "",
+        Parameters for solving the subproblem.
 
     Attributes
     ----------
@@ -108,15 +131,17 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
 
         self.X_ = X
         self.y_ = y
-        self.label_encoder = LabelEncoder()
-        self.processed_y_ = self.label_encoder.fit_transform(y)
+
+        # Convert the y into integer class lables.
+        self.label_encoder_ = LabelEncoder()
+        self.processed_y_ = self.label_encoder_.fit_transform(y)
         # Store the classes seen during fit
         self.classes_ = unique_labels(y)
         if len(self.classes_) <= 1:
             raise ValueError("Classifier can't train when only one class is present.")
 
         # Initiate the master and subproblems
-        self.master_problem.generate_mp(X, self.processed_y_, params=None) 
+        self.master_problem.generate_mp(X, self.processed_y_) 
 
         for iter in range(self.max_iterations):
             # Solve RMIP
