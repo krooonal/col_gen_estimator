@@ -1,6 +1,8 @@
 build: false
 
 environment:
+  APPVEYOR_RDP_PASSWORD:
+    secure: 119Ycdho/AO+RNUqDVYsRIkDddJ82e+MKJ6PV8oi9a4=
   matrix:
     - PYTHON: "C:\\Miniconda3-x64"
       PYTHON_VERSION: "3.5.x"
@@ -15,6 +17,9 @@ environment:
       NUMPY_VERSION: "*"
       SCIPY_VERSION: "*"
       SKLEARN_VERSION: "*"
+
+init:
+  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 install:
   # Prepend miniconda installed Python to the PATH of this build
@@ -35,3 +40,6 @@ after_test:
   - cp .coverage %APPVEYOR_BUILD_FOLDER%
   - cd %APPVEYOR_BUILD_FOLDER%
   - codecov
+
+on_finish:
+  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
