@@ -12,5 +12,6 @@ from ._version import __version__
 
 __all__ = ['TemplateEstimator', 'TemplateClassifier', 'TemplateTransformer',
            'BaseMasterProblem', 'BaseSubproblem', 'ColGenClassifier',
-           'BDRMasterProblem', 'BDRSubProblem', 'BooleanDecisionRuleClassifier',
+           'BDRMasterProblem', 'BDRSubProblem',
+           'BooleanDecisionRuleClassifier',
            '__version__']

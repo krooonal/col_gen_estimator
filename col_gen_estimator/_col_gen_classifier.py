@@ -1,19 +1,22 @@
 """
-Base Column Genaration Classifier. One needs to extend this for implementing column generation based 
-classifiers.
+Base Column Genaration Classifier. One needs to extend this for implementing 
+column generation based classifiers.
 """
 
 from sklearn.base import BaseEstimator, ClassifierMixin
 
+
 class BaseMasterProblem():
-    """ Base class for master problem. One needs to extend this for using with ColGenClassifier.
+    """ Base class for master problem. One needs to extend this for using with 
+    ColGenClassifier.
     """
 
     def __init__(self):
         pass
-    
-    def generate_mp(self,X,y):
-        """ Generates the master problem model (RMP) and initializes the primal and dual solutions.
+
+    def generate_mp(self, X, y):
+        """ Generates the master problem model (RMP) and initializes the primal 
+        and dual solutions.
         Parameters
         ----------
         X : ndarray, shape (n_samples, n_features)
@@ -23,7 +26,7 @@ class BaseMasterProblem():
         """
         pass
 
-    def add_column(self,column):
+    def add_column(self, column):
         """ Adds the given column to the master problem model.
         Parameters
         ----------
@@ -32,7 +35,7 @@ class BaseMasterProblem():
         """
         pass
 
-    def solve_rmp(self,solver_params=''):
+    def solve_rmp(self, solver_params=''):
         """ Solves the RMP with given solver params.
         Returns the dual costs.
         Parameters
@@ -42,7 +45,7 @@ class BaseMasterProblem():
         """
         pass
 
-    def solve_ip(self,solver_params=''):
+    def solve_ip(self, solver_params=''):
         """ Solves the integer RMP with given solver params. 
         Returns false if the problem is not solved.
         Parameters
@@ -52,8 +55,10 @@ class BaseMasterProblem():
         """
         pass
 
+
 class BaseSubproblem():
-    """ Base class for subproblem. One needs to extend this for using with ColGenClassifier.
+    """ Base class for subproblem. One needs to extend this for using with 
+    ColGenClassifier.
     """
 
     def generate_columns(self, X, y, dual_costs, params):
@@ -61,15 +66,16 @@ class BaseSubproblem():
         """
         pass
 
+
 class ColGenClassifier(ClassifierMixin, BaseEstimator):
-    """ Base Column Genaration Classifier. One needs to extend this for implementing column generation 
-    based classifiers.
+    """ Base Column Genaration Classifier. One needs to extend this for 
+    implementing column generation based classifiers.
 
     Parameters
     ----------
     max_iterations : int, default=-1
-        Maximum column generation iterations. Negative values removes the iteration limit and the problem
-        is solved till optimality.
+        Maximum column generation iterations. Negative values removes the 
+        iteration limit and the problem is solved till optimality.
     master_problem : Instance of BaseMasterProblem, default = BaseSubproblem()
     subproblem : Instance of BaseSubproblem, default = BaseSubproblem()
     rmp_is_ip : boolean, default = False
@@ -90,13 +96,14 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
     classes_ : ndarray, shape (n_classes,)
         The classes seen at :meth:`fit`.
     """
-    def __init__(self, max_iterations=-1, 
-            master_problem = BaseMasterProblem(), 
-            subproblem = BaseSubproblem(),
-            rmp_is_ip = False,
-            rmp_solver_params = "", 
-            master_ip_solver_params = "",
-            subproblem_params = ""):
+
+    def __init__(self, max_iterations=-1,
+                 master_problem=BaseMasterProblem(),
+                 subproblem=BaseSubproblem(),
+                 rmp_is_ip=False,
+                 rmp_solver_params="",
+                 master_ip_solver_params="",
+                 subproblem_params=""):
         self.max_iterations = max_iterations
         self.master_problem = master_problem
         self.subproblem = subproblem
@@ -104,7 +111,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         self.rmp_solver_params = rmp_solver_params
         self.master_ip_solver_params = master_ip_solver_params
         self.subproblem_params = subproblem_params
-        
+
     def fit(self, X, y):
         """Runs the column generation loop.
 
@@ -123,7 +130,8 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         return self
 
     def predict(self, X):
-        """ Predicts the class based on the solution of master problem. This method is abstract.
+        """ Predicts the class based on the solution of master problem. This 
+        method is abstract.
 
         Parameters
         ----------
