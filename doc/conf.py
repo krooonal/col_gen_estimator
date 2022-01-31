@@ -319,6 +319,6 @@ sphinx_gallery_conf = {
 
 def setup(app):
     # a copy button to copy snippet of code from the documentation
-    # TODO: Fix this. This is failing circleCI builds.
+    # TODO(krunal): Fix this
     # app.add_javascript('js/copybutton.js')
     pass
