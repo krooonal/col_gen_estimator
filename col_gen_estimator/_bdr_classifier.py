@@ -42,7 +42,7 @@ formula. Clearly, the number of clauses is exponential, so the columns for w_k
 are generated through a subproblem.
 
 The reduced cost for a column $w_k$ is given by
-\sum_{i in mathcal{Z}} delta_i - sum_{i in mathcal{P}} mu_i delta_i + lambda
+sum_{i in mathcal{Z}} delta_i - sum_{i in mathcal{P}} mu_i delta_i + lambda
 c_k where mu_i (>= 0) are the dual costs for constraints (1a) and lambda (>= 0)
 is the dual cost for constraint (1c). The binary variable delta_i is set to 1
 if the ith example satisfies the clause w_k.
