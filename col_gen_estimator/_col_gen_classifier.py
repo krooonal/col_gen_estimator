@@ -1,5 +1,5 @@
 """
-Base Column Genaration Classifier. One needs to extend this for implementing 
+Base Column Genaration Classifier. One needs to extend this for implementing
 column generation based classifiers.
 """
 
@@ -7,7 +7,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 
 
 class BaseMasterProblem():
-    """ Base class for master problem. One needs to extend this for using with 
+    """ Base class for master problem. One needs to extend this for using with
     ColGenClassifier.
     """
 
@@ -15,7 +15,7 @@ class BaseMasterProblem():
         pass
 
     def generate_mp(self, X, y):
-        """ Generates the master problem model (RMP) and initializes the primal 
+        """ Generates the master problem model (RMP) and initializes the primal
         and dual solutions.
         Parameters
         ----------
@@ -46,7 +46,7 @@ class BaseMasterProblem():
         pass
 
     def solve_ip(self, solver_params=''):
-        """ Solves the integer RMP with given solver params. 
+        """ Solves the integer RMP with given solver params.
         Returns false if the problem is not solved.
         Parameters
         ----------
@@ -57,7 +57,7 @@ class BaseMasterProblem():
 
 
 class BaseSubproblem():
-    """ Base class for subproblem. One needs to extend this for using with 
+    """ Base class for subproblem. One needs to extend this for using with
     ColGenClassifier.
     """
 
@@ -68,13 +68,13 @@ class BaseSubproblem():
 
 
 class ColGenClassifier(ClassifierMixin, BaseEstimator):
-    """ Base Column Genaration Classifier. One needs to extend this for 
+    """ Base Column Genaration Classifier. One needs to extend this for
     implementing column generation based classifiers.
 
     Parameters
     ----------
     max_iterations : int, default=-1
-        Maximum column generation iterations. Negative values removes the 
+        Maximum column generation iterations. Negative values removes the
         iteration limit and the problem is solved till optimality.
     master_problem : Instance of BaseMasterProblem, default = BaseSubproblem()
     subproblem : Instance of BaseSubproblem, default = BaseSubproblem()
@@ -130,7 +130,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         return self
 
     def predict(self, X):
-        """ Predicts the class based on the solution of master problem. This 
+        """ Predicts the class based on the solution of master problem. This
         method is abstract.
 
         Parameters
