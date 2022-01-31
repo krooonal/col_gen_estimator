@@ -7,9 +7,9 @@ volume 31. Curran Associates, Inc., 2018.
 
 The model is designed for binary classification. The model generates a boolean
 decision rule in DNF (Disjunctive Normal Form, OR-of-ANDs). An example of a DNF
-rule with two clauses is "(x1 AND x2) OR (x3 AND x5 AND x7)". These rules return
-True when the example belongs to the class and False otherwise. These binary
-rules also serve as explanation for the output class.
+rule with two clauses is "(x1 AND x2) OR (x3 AND x5 AND x7)". These rules
+return True when the example belongs to the class and False otherwise. These
+binary rules also serve as explanation for the output class.
 
 Sets
 P set of all positive examples in the dataset.
@@ -35,17 +35,17 @@ z_{MIP} = min   sum_{i in P} p*xi_i + sum_{i in Z} sum_{k in K_i} w_k   (obj)
 
 The first sum in the objective is the penalty for the misclassified positive
 examples, and the second part is the penalty for the misclassified negative
-examples. Constraints (1a) ensure that each positive example either satisfies at
-least one of the selected clause or the associated penalty variable is set to 1.
-Constraints (1b) control the overall complexity of the generated DNF formula.
-Clearly, the number of clauses is exponential, so the columns for w_k are
-generated through a subproblem.
+examples. Constraints (1a) ensure that each positive example either satisfies
+at least one of the selected clause or the associated penalty variable is set
+to 1. Constraints (1b) control the overall complexity of the generated DNF
+formula. Clearly, the number of clauses is exponential, so the columns for w_k
+are generated through a subproblem.
 
 The reduced cost for a column $w_k$ is given by
-\sum_{i in mathcal{Z}} delta_i - sum_{i in mathcal{P}} mu_i delta_i + lambda c_k
-where mu_i (>= 0) are the dual costs for constraints (1a) and lambda (>= 0) is
-the dual cost for constraint (1c). The binary variable delta_i is set to 1 if
-the ith example satisfies the clause w_k.
+\sum_{i in mathcal{Z}} delta_i - sum_{i in mathcal{P}} mu_i delta_i + lambda
+c_k where mu_i (>= 0) are the dual costs for constraints (1a) and lambda (>= 0)
+is the dual cost for constraint (1c). The binary variable delta_i is set to 1
+if the ith example satisfies the clause w_k.
 
 Sets
 P  set of all positive examples in the dataset.
@@ -70,16 +70,16 @@ z_{CG} = min    lambda*(1 + sum_{j in J} z_j) -
                 z_j in {0,1}, j in J                                    (2d)
                 delta_i >= 0, i in Z                                    (2e)
 
-In the objective, the term 1 + sum_{j in J} z_j is equal to the generated clause
-complexity, i.e., to 1 plus the clause size. This objective function corresponds
-to the reduced cost of the clause generated. Negative objective values identify
-clauses with a negative reduced cost, and the clause can be added to the
-restricted master problem (RMP) in (1). The clause is constructed by selecting
-the words for which the corresponding z variables are set to 1. The constraints
-(2a) - (2b) relate the selected features with the delta variables. Constraint
-(2c) controls the complexity of the clause being generated.  Note that here the
-variables delta_i are binary but need not be encoded as binary, as it is
-implied.
+In the objective, the term 1 + sum_{j in J} z_j is equal to the generated
+clause complexity, i.e., to 1 plus the clause size. This objective function
+corresponds to the reduced cost of the clause generated. Negative objective
+values identify clauses with a negative reduced cost, and the clause can be
+added to the restricted master problem (RMP) in (1). The clause is constructed
+by selecting the words for which the corresponding z variables are set to 1.
+The constraints (2a) - (2b) relate the selected features with the delta
+variables. Constraint (2c) controls the complexity of the clause being
+generated.  Note that here the variables delta_i are binary but need not be
+encoded as binary, as it is implied.
 """
 import numpy as np
 from ortools.linear_solver import pywraplp
@@ -90,8 +90,8 @@ from ._col_gen_classifier import ColGenClassifier
 
 class BDRMasterProblem(BaseMasterProblem):
     """The master problem for boolean decision rule generation described in
-    'Boolean decision rules via column generation' by Sanjeeb Dash et. al. 2018.
-    This extends the BaseMasterProblem for column generation classifier.
+    'Boolean decision rules via column generation' by Sanjeeb Dash et. al.
+    2018. This extends the BaseMasterProblem for column generation classifier.
 
     Parameters
     ----------
@@ -200,8 +200,8 @@ class BDRMasterProblem(BaseMasterProblem):
 
 class BDRSubProblem(BaseSubproblem):
     """The  subproblem for boolean decision rule generation described in
-    'Boolean decision rules via column generation' by Sanjeeb Dash et. al. 2018.
-    This extends the BaseSubproblem for column generation classifier.
+    'Boolean decision rules via column generation' by Sanjeeb Dash et. al.
+    2018. This extends the BaseSubproblem for column generation classifier.
 
     Parameters
     ----------
@@ -214,8 +214,8 @@ class BDRSubProblem(BaseSubproblem):
     Attributes
     ----------
     X_ : ndarray, shape (n_samples, n_features)
-        The input passed during :meth:`generate_columns`. The inputs should only
-        contain values in {0,1}.
+        The input passed during :meth:`generate_columns`. The inputs should
+        only contain values in {0,1}.
     y_ : ndarray, shape (n_samples,)
         The labels passed during :meth:`generate_columns`. The labels should
         only contain values in {0,1}.
@@ -239,8 +239,8 @@ class BDRSubProblem(BaseSubproblem):
         self.z_vars_ = None
 
     def create_submip(self, cc_dual, cs_duals):
-        """Creates the model for the subproblem. This should be called only once
-        for a given problem.
+        """Creates the model for the subproblem. This should be called only
+        once for a given problem.
         Parameters
         ----------
         cc_dual : float,
@@ -252,8 +252,8 @@ class BDRSubProblem(BaseSubproblem):
         return
 
     def update_objective(self, cc_dual, cs_duals):
-        """Updates the objective of the generated subproblem. This can be called
-        only after the
+        """Updates the objective of the generated subproblem. This can be
+        called only after the create_submip method has been called.
         Parameters
         ----------
         cc_dual : float,
