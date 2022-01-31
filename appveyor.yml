@@ -18,9 +18,6 @@ environment:
       SCIPY_VERSION: "*"
       SKLEARN_VERSION: "*"
 
-init:
-  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
-
 install:
   # Prepend miniconda installed Python to the PATH of this build
   # Add Library/bin directory to fix issue
@@ -34,7 +31,7 @@ install:
 test_script:
   - mkdir for_test
   - cd for_test
-  - pytest -v --cov=col_gen_estimator --pyargs col_gen_estimator
+  - pytest -v --cov=col_gen_estimator --pyargs col_gen_estimator > logs.txt 2>&1 &
 
 after_test:
   - cp .coverage %APPVEYOR_BUILD_FOLDER%
