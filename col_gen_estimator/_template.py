@@ -21,7 +21,7 @@ class TemplateEstimator(BaseEstimator):
 
     Examples
     --------
-    >>> from skltemplate import TemplateEstimator
+    >>> from col_gen_estimator import TemplateEstimator
     >>> import numpy as np
     >>> X = np.arange(100).reshape(100, 1)
     >>> y = np.zeros((100, ))
@@ -29,6 +29,7 @@ class TemplateEstimator(BaseEstimator):
     >>> estimator.fit(X, y)
     TemplateEstimator()
     """
+
     def __init__(self, demo_param='demo_param'):
         self.demo_param = demo_param
 
@@ -91,6 +92,7 @@ class TemplateClassifier(ClassifierMixin, BaseEstimator):
     classes_ : ndarray, shape (n_classes,)
         The classes seen at :meth:`fit`.
     """
+
     def __init__(self, demo_param='demo'):
         self.demo_param = demo_param
 
@@ -159,6 +161,7 @@ class TemplateTransformer(TransformerMixin, BaseEstimator):
     n_features_ : int
         The number of features of the data passed to :meth:`fit`.
     """
+
     def __init__(self, demo_param='demo'):
         self.demo_param = demo_param
 
