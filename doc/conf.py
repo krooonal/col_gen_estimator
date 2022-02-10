@@ -12,6 +12,9 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+from col_gen_estimator import __version__
+from distutils.version import LooseVersion
+import sphinx
 import sys
 import os
 
@@ -49,8 +52,6 @@ extensions = [
 numpydoc_show_class_members = False
 
 # pngmath / imgmath compatibility layer for different sphinx versions
-import sphinx
-from distutils.version import LooseVersion
 if LooseVersion(sphinx.__version__) < LooseVersion('1.4'):
     extensions.append('sphinx.ext.pngmath')
 else:
@@ -85,7 +86,6 @@ copyright = u'2021, Krunal Patel'
 # built documents.
 #
 # The short X.Y version.
-from col_gen_estimator import __version__
 version = __version__
 # The full version, including alpha/beta/rc tags.
 release = __version__
@@ -220,22 +220,22 @@ htmlhelp_basename = 'project-templatedoc'
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
-# The paper size ('letterpaper' or 'a4paper').
-#'papersize': 'letterpaper',
+    # The paper size ('letterpaper' or 'a4paper').
+    # 'papersize': 'letterpaper',
 
-# The font size ('10pt', '11pt' or '12pt').
-#'pointsize': '10pt',
+    # The font size ('10pt', '11pt' or '12pt').
+    # 'pointsize': '10pt',
 
-# Additional stuff for the LaTeX preamble.
-#'preamble': '',
+    # Additional stuff for the LaTeX preamble.
+    # 'preamble': '',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'project-template.tex', u'project-template Documentation',
-   u'Vighnesh Birodkar', 'manual'),
+    ('index', 'project-template.tex', u'project-template Documentation',
+     u'Krunal Patel', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -265,7 +265,7 @@ latex_documents = [
 # (source start file, name, description, authors, manual section).
 man_pages = [
     ('index', 'project-template', u'project-template Documentation',
-     [u'Vighnesh Birodkar'], 1)
+     [u'Krunal Patel'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -278,9 +278,10 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'project-template', u'project-template Documentation',
-   u'Vighnesh Birodkar', 'project-template', 'One line description of project.',
-   'Miscellaneous'),
+    ('index', 'project-template', u'project-template Documentation',
+     u'Krunal Patel', 'project-template',
+     'One line description of project.',
+     'Miscellaneous'),
 ]
 
 # Documents to append as an appendix to all manuals.
@@ -314,6 +315,7 @@ sphinx_gallery_conf = {
     'reference_url': {
         'col_gen_estimator': None}
 }
+
 
 def setup(app):
     # a copy button to copy snippet of code from the documentation

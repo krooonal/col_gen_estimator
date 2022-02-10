@@ -3,3 +3,5 @@ dependencies:
   - numpy
   - scipy
   - scikit-learn
+  - ortools
+  - bitarray
