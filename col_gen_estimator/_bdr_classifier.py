@@ -289,7 +289,6 @@ class BDRMasterProblem(BaseMasterProblem):
         n_positive_examples = self.solver_.NumConstraints() - 1
 
         # TODO: Hide this under optional logging flag.
-        # print('LP Problem solved in %f milliseconds' % self.solver_.wall_time())
         print('Number of variables RMIP = %d' % self.solver_.NumVariables())
         print('Number of constraints RMIP = %d' %
               self.solver_.NumConstraints())
@@ -317,13 +316,14 @@ class BDRMasterProblem(BaseMasterProblem):
         """
         assert self.generated_
 
-        # We can use sat here since all the coefficients and variables are integer.
-        # We can also use gurobi. But sat is 2-3 times faster.
+        # We can use sat here since all the coefficients and variables are
+        # integer. We can also use gurobi. But sat is 2-3 times faster.
         # TODO: Solver type should be a parameter.
         solver = pywraplp.Solver.CreateSolver("sat")
 
         # We have to load the model from LP solver.
-        # This copy is not avoidable with OR-Tools since we are now switching form solving LP to solving IP.
+        # This copy is not avoidable with OR-Tools since we are now switching
+        # form solving LP to solving IP.
         model_proto = linear_solver_pb2.MPModelProto()
         self.solver_.ExportModelToProto(model_proto)
         solver.LoadModelFromProto(model_proto)
@@ -352,7 +352,8 @@ class BDRMasterProblem(BaseMasterProblem):
 
     @staticmethod
     def satisfies_clause(entry, clause):
-        """ Given the entry and clause, returns 1 if the entry satisfies the clause and 0 oterwise.
+        """ Given the entry and clause, returns 1 if the entry satisfies the
+        clause and 0 oterwise.
         Parameters
         ----------
         entry : ndarray, shape(n_features)
@@ -384,7 +385,8 @@ class BDRMasterProblem(BaseMasterProblem):
         return num_entries_satisfying_clause
 
     def get_clause_coeffs(self, clause):
-        """ Given the clause, returns the coefficients for corresponding variable in RMP.
+        """ Given the clause, returns the coefficients for corresponding
+        variable in RMP.
         Parameters
         ----------
         clause : list(int),
