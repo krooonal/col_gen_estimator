@@ -190,14 +190,16 @@ class BDRMasterProblem(BaseMasterProblem):
         objective = self.solver_.Objective()
         self.xi_vars_ = [None]*n_positive_examples
         for i in range(n_positive_examples):
-            # This need not be a boolean variable. The upper bound is not needed.
+            # This need not be a boolean variable.
+            # The upper bound is not needed.
             xi_var = self.solver_.IntVar(0.0, infinity, 'p_'+str(i))
             self.xi_vars_[i] = xi_var.index()
             objective.SetCoefficient(xi_var, self.p_)
 
         self.clause_vars_ = [None]*n_clauses
         for i in range(n_clauses):
-            # This need not be a boolean variable. The upper bound is not needed.
+            # This need not be a boolean variable.
+            # The upper bound is not needed.
             clause_var = self.solver_.IntVar(0.0, infinity, 'c_'+str(i))
             self.clause_vars_[i] = clause_var.index()
             clause = self.generate_lexicographic_clause(i)
@@ -230,11 +232,11 @@ class BDRMasterProblem(BaseMasterProblem):
         self.generated_ = True
 
     def add_column(self, clause):
-        """Adds the given column to the master problem model. Retuns True if 
+        """Adds the given column to the master problem model. Retuns True if
         the column is added to the master problem.
 
-        Boolean decision rule generation is a special case where we take the 
-        clause as input instead of the column coefficients. 
+        Boolean decision rule generation is a special case where we take the
+        clause as input instead of the column coefficients.
 
         Parameters
         ----------
@@ -356,7 +358,7 @@ class BDRMasterProblem(BaseMasterProblem):
         entry : ndarray, shape(n_features)
             The input example. The array should have values in {0,1}.
         clause : list(int),
-            The list containing the indices of features present in the clause. 
+            The list containing the indices of features present in the clause.
         """
         for index in clause:
             if entry[index] == 0:
@@ -368,7 +370,7 @@ class BDRMasterProblem(BaseMasterProblem):
         Parameters
         ----------
         clause : list(int),
-            The list containing the indices of features present in the clause. 
+            The list containing the indices of features present in the clause.
         """
         num_entries_satisfying_clause = 0
         for i in range(len(self.X_)):
@@ -386,7 +388,7 @@ class BDRMasterProblem(BaseMasterProblem):
         Parameters
         ----------
         clause : list(int),
-            The list containing the indices of features present in the clause. 
+            The list containing the indices of features present in the clause.
         """
         # no of rows = No of positive examples + 1.
         coeffs = []
@@ -403,7 +405,7 @@ class BDRMasterProblem(BaseMasterProblem):
 
     @staticmethod
     def generate_lexicographic_clause(index):
-        """ Generates the 'index'th clause as per lexicogrphical index. 
+        """ Generates the 'index'th clause as per lexicogrphical index.
         Parameters
         ----------
         index : int.
