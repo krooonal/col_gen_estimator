@@ -1,14 +1,10 @@
 import pytest
 import numpy as np
 
-from sklearn.datasets import load_iris
 from numpy.testing import assert_array_equal
-from numpy.testing import assert_allclose
 from numpy.testing import assert_equal
 
-from col_gen_estimator import BooleanDecisionRuleClassifier
 from col_gen_estimator import BDRMasterProblem
-from col_gen_estimator import BDRSubProblem
 
 
 @pytest.fixture
@@ -60,7 +56,9 @@ def test_get_clause_coeffs(data):
     # [complexity] Coeff = size of clause +1
     master_problem = BDRMasterProblem(
         C=10, p=1, optimization_problem_type='glop')
+    assert_equal(master_problem.generated_, False)
     master_problem.generate_mp(data[0], data[1])
+    assert_equal(master_problem.generated_, True)
     assert_array_equal(master_problem.get_clause_coeffs(
         clause=[0, 3]), [0, 1, 3])
     assert_array_equal(master_problem.get_clause_coeffs(clause=[2]), [1, 0, 2])
@@ -82,7 +80,27 @@ def test_add_column(data):
         C=10, p=1, optimization_problem_type='glop')
     master_problem.generate_mp(data[0], data[1])
     clause = [0, 1]  # Clause that is only satisfied by positive examples.
-    master_problem.add_column(clause)
+    assert_equal(master_problem.add_column(clause), True)
     solved = master_problem.solve_ip()
     assert_equal(solved, True)
     assert_array_equal(master_problem.explanation, [[0, 1]])
+
+
+def test_add_empty_column(data):
+    master_problem = BDRMasterProblem(
+        C=10, p=1, optimization_problem_type='glop')
+    master_problem.generate_mp(data[0], data[1])
+    clause = []
+    assert_equal(master_problem.add_column(clause), False)
+
+
+def test_regenerate_mp(data):
+    # This test should cover the 'if' check at the start of 'generate_mp'
+    # method.
+    master_problem = BDRMasterProblem(
+        C=10, p=1, optimization_problem_type='glop')
+    assert_equal(master_problem.generated_, False)
+    master_problem.generate_mp(data[0], data[1])
+    assert_equal(master_problem.generated_, True)
+    master_problem.generate_mp(data[0], data[1])
+    assert_equal(master_problem.generated_, True)
