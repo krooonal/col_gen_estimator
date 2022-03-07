@@ -531,7 +531,7 @@ class BDRSubProblem(BaseSubproblem):
         cs_duals : list(float),
             dual costs of clause satisfaction constraints (1a).
         """
-        assert self.generated_, "Update objective called before generating the subproblem."
+        assert self.generated_, "Subproblem not generated."
         n_words = self.X_.shape[1]
         n_samples = self.X_.shape[0]
         objective = self.solver_.Objective()
