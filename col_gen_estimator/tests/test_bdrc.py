@@ -5,6 +5,7 @@ from numpy.testing import assert_array_equal
 from numpy.testing import assert_equal
 
 from col_gen_estimator import BDRMasterProblem
+from col_gen_estimator import BDRSubProblem
 
 
 @pytest.fixture
@@ -104,3 +105,16 @@ def test_regenerate_mp(data):
     assert_equal(master_problem.generated_, True)
     master_problem.generate_mp(data[0], data[1])
     assert_equal(master_problem.generated_, True)
+
+
+def test_sp_generate_column(data):
+    subproblem = BDRSubProblem(D=10, optimization_problem_type='cbc')
+    assert_equal(subproblem.generated_, False)
+    clauses = subproblem.generate_columns(
+        data[0], data[1], dual_costs=(0, [1, 1]))
+    assert_array_equal(clauses, [[0, 1]])
+    assert_equal(subproblem.generated_, True)
+    # Call generate again. Only objective should be updated.
+    clauses = subproblem.generate_columns(
+        data[0], data[1], dual_costs=(0, [0, 0]))
+    assert_array_equal(clauses, [])

@@ -468,8 +468,58 @@ class BDRSubProblem(BaseSubproblem):
         cs_duals : list(float),
             dual costs of clause satisfaction constraints (1a).
         """
-        # TODO: Implement this method.
-        return
+        assert not self.generated_, "SP is already created."
+        infinity = self.solver_.infinity()
+
+        n_words = self.X_.shape[1]
+        n_samples = self.X_.shape[0]
+
+        self.z_vars_ = [None]*n_words
+        objective = self.solver_.Objective()
+        for i in range(n_words):
+            z_var = self.solver_.BoolVar('z_'+str(i))
+            self.z_vars_[i] = z_var.index()
+            objective.SetCoefficient(z_var, cc_dual)
+
+        self.delta_vars_ = [None]*n_samples
+        n_positive_examples = 0
+        for i in range(n_samples):
+            # This need not be a boolean variable.
+            delta_var = self.solver_.BoolVar('d_'+str(i))
+            self.delta_vars_[i] = delta_var.index()
+            obj_coeff = 1
+            target = self.y_[i]
+            if target == 1:
+                obj_coeff *= -cs_duals[n_positive_examples]
+                n_positive_examples += 1
+            objective.SetCoefficient(delta_var, obj_coeff)
+
+        objective.SetOffset(cc_dual)
+        objective.SetMinimization()
+
+        # Constraints
+        for i in range(n_samples):
+            delta_var = self.solver_.variable(self.delta_vars_[i])
+            if self.y_[i] == 1:
+                for j in range(n_words):
+                    if self.X_[i, j] == 0:
+                        cons = self.solver_.Constraint(0, 1, "pos_" + str(i))
+                        z_var = self.solver_.variable(self.z_vars_[j])
+                        cons.SetCoefficient(delta_var, 1)
+                        cons.SetCoefficient(z_var, 1)
+            else:
+                cons = self.solver_.Constraint(1, infinity, "zero_" + str(i))
+                cons.SetCoefficient(delta_var, 1)
+                for j in range(n_words):
+                    if self.X_[i, j] == 0:
+                        z_var = self.solver_.variable(self.z_vars_[j])
+                        cons.SetCoefficient(z_var, 1)
+
+        cc_const = self.solver_.Constraint(0, self.D_, "clause_complexity")
+        for j in range(n_words):
+            z_var = self.solver_.variable(self.z_vars_[j])
+            cc_const.SetCoefficient(z_var, 1)
+        self.generated_ = True
 
     def update_objective(self, cc_dual, cs_duals):
         """Updates the objective of the generated subproblem. This can be
@@ -481,8 +531,26 @@ class BDRSubProblem(BaseSubproblem):
         cs_duals : list(float),
             dual costs of clause satisfaction constraints (1a).
         """
-        # TODO: Implement this method.
-        return
+        assert self.generated_, "Subproblem not generated."
+        n_words = self.X_.shape[1]
+        n_samples = self.X_.shape[0]
+        objective = self.solver_.Objective()
+        for i in range(n_words):
+            z_var = self.solver_.variable(self.z_vars_[i])
+            objective.SetCoefficient(z_var, cc_dual)
+
+        n_positive_examples = 0
+        for i in range(n_samples):
+            obj_coeff = 1
+            target = self.y_[i]
+            if target == 1:
+                obj_coeff *= -cs_duals[n_positive_examples]
+                n_positive_examples += 1
+            delta_var = self.solver_.variable(self.delta_vars_[i])
+            objective.SetCoefficient(delta_var, obj_coeff)
+
+        objective.SetOffset(cc_dual)
+        objective.SetMinimization()
 
     def generate_columns(self, X, y, dual_costs, params=""):
         """Generates the new columns to be added to the RMP.
@@ -501,8 +569,40 @@ class BDRSubProblem(BaseSubproblem):
         params : string, default=""
             Solver parameters.
         """
-        # TODO: Implement this method.
-        return []
+        self.X_ = X
+        self.y_ = y
+        cc_dual = dual_costs[0]
+        cs_duals = dual_costs[1]
+        # We assume the positive dual cost in this model.
+        assert cc_dual >= 0, "Negative clause complexity dual"
+        for cs_dual in cs_duals:
+            assert cs_dual >= 0, "Negative clause satisfaction dual"
+
+        if self.generated_:
+            self.update_objective(cc_dual, cs_duals)
+        else:
+            self.create_submip(cc_dual, cs_duals)
+
+        # Solve sub problem
+        result_status = self.solver_.Solve(get_params_from_string(params))
+
+        # Empty column is always feasible.
+        has_solution = (result_status == pywraplp.Solver.OPTIMAL or
+                        result_status == pywraplp.Solver.FEASIBLE)
+        assert has_solution
+
+        # Try to generate the clause if negative objective
+        # TODO: This threshold should be a parameter.
+        if self.solver_.Objective().Value() >= -1e-6:
+            return []
+
+        clause = []
+        for i in range(len(self.z_vars_)):
+            z_var = self.solver_.variable(self.z_vars_[i])
+            if z_var.solution_value() > 0:
+                clause.append(i)
+
+        return [clause]
 
 
 class BooleanDecisionRuleClassifier(ColGenClassifier):
