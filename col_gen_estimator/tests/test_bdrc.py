@@ -38,7 +38,7 @@ def test_default_params():
     assert clf.rmp_solver_params == ""
     assert clf.master_ip_solver_params == ""
     assert clf.subproblem_params == ""
-    assert clf.rmp_is_ip == True
+    assert clf.rmp_is_ip
 
 
 def test_fit_predict(data):

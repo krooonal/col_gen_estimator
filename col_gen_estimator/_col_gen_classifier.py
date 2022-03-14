@@ -154,8 +154,8 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
             # Solve RMIP
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
 
-            generated_columns = self.subproblem.generate_columns(X, self.processed_y_,
-                                                                 dual_costs, self.subproblem_params)
+            generated_columns = self.subproblem.generate_columns(
+                X, self.processed_y_, dual_costs, self.subproblem_params)
 
             rmp_updated = False
             for column in generated_columns:
