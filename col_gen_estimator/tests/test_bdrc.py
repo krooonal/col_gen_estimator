@@ -56,7 +56,7 @@ def test_fit_predict(data):
     assert_array_equal(y_pred, data[1])
 
 
-def test_fit_predict(data_one_class):
+def test_fit_predict_one_class(data_one_class):
     clf = BooleanDecisionRuleClassifier(max_iterations=3, C=10, p=1)
     with assert_raises(ValueError):
         clf.fit(data_one_class[0], data_one_class[1])
