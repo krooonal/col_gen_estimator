@@ -85,6 +85,7 @@ import numpy as np
 from bitarray.util import int2ba
 from ortools.linear_solver import pywraplp
 from ortools.linear_solver import linear_solver_pb2
+from sklearn.utils.validation import check_array, check_is_fitted
 from ._col_gen_classifier import BaseMasterProblem
 from ._col_gen_classifier import BaseSubproblem
 from ._col_gen_classifier import ColGenClassifier
@@ -677,5 +678,16 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
         y : ndarray, shape (n_samples,)
             The label for each sample. The labels only contain values in {0,1}.
         """
-        # TODO: Implement this method.
-        return np.zeros(X.shape[0], dtype=int)
+        X = check_array(X, accept_sparse=True)
+        check_is_fitted(self, 'is_fitted_')
+        explanation = self.master_problem.explanation
+        print("Explanation=", explanation)
+        # Check if the input satisfies any of the clause in explanation.
+        y_predict = np.zeros(X.shape[0], dtype=int)
+        for i in range(X.shape[0]):
+            for clause in explanation:
+                if self.master_problem.satisfies_clause(X[i], clause):
+                    y_predict[i] = 1
+                    break
+        # Translate y back to original form.
+        return self.label_encoder_.inverse_transform(y_predict)

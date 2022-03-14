@@ -3,7 +3,9 @@ import numpy as np
 
 from numpy.testing import assert_array_equal
 from numpy.testing import assert_equal
+from numpy.testing import assert_raises
 
+from col_gen_estimator import BooleanDecisionRuleClassifier
 from col_gen_estimator import BDRMasterProblem
 from col_gen_estimator import BDRSubProblem
 
@@ -16,6 +18,48 @@ def data():
                   [1, 0, 1, 1]], np.int8)
     y = np.array([1, 1, 0, 0], np.int8)
     return (X, y)
+
+
+@pytest.fixture
+def data_one_class():
+    X = np.array([[1, 1, 1, 0],
+                  [1, 1, 0, 1],
+                  [0, 1, 1, 1],
+                  [1, 0, 1, 1]], np.int8)
+    y = np.array([1, 1, 1, 1], np.int8)
+    return (X, y)
+
+
+def test_default_params():
+    clf = BooleanDecisionRuleClassifier()
+    assert clf.max_iterations == -1
+    assert clf.C == 10
+    assert clf.p == 1
+    assert clf.rmp_solver_params == ""
+    assert clf.master_ip_solver_params == ""
+    assert clf.subproblem_params == ""
+    assert clf.rmp_is_ip == True
+
+
+def test_fit_predict(data):
+    clf = BooleanDecisionRuleClassifier(max_iterations=3, C=10, p=1)
+    clf.fit(data[0], data[1])
+    assert hasattr(clf, 'is_fitted_')
+
+    assert hasattr(clf, 'classes_')
+    assert hasattr(clf, 'X_')
+    assert hasattr(clf, 'y_')
+
+    X = data[0]
+    y_pred = clf.predict(X)
+    assert y_pred.shape == (X.shape[0],)
+    assert_array_equal(y_pred, data[1])
+
+
+def test_fit_predict(data_one_class):
+    clf = BooleanDecisionRuleClassifier(max_iterations=3, C=10, p=1)
+    with assert_raises(ValueError):
+        clf.fit(data_one_class[0], data_one_class[1])
 
 
 def test_mp_satisfies_clause():
