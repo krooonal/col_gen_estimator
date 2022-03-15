@@ -4,6 +4,9 @@ column generation based classifiers.
 """
 
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.utils.validation import check_X_y
+from sklearn.utils.multiclass import unique_labels
+from sklearn.preprocessing import LabelEncoder
 
 
 class BaseMasterProblem():
@@ -127,6 +130,47 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         self : object
             Returns self.
         """
+        # Check that X and y have correct shape
+        X, y = check_X_y(X, y)
+        # Store the classes seen during fit
+        self.classes_ = unique_labels(y)
+
+        self.X_ = X
+        self.y_ = y
+
+        # Convert the y into integer class lables.
+        self.label_encoder_ = LabelEncoder()
+        self.processed_y_ = self.label_encoder_.fit_transform(y)
+        # Store the classes seen during fit
+        self.classes_ = unique_labels(y)
+        if len(self.classes_) <= 1:
+            raise ValueError(
+                "Classifier can't train when only one class is present.")
+
+        # Initiate the master and subproblems
+        self.master_problem.generate_mp(X, self.processed_y_)
+
+        for iter in range(self.max_iterations):
+            # Solve RMIP
+            dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
+
+            generated_columns = self.subproblem.generate_columns(
+                X, self.processed_y_, dual_costs, self.subproblem_params)
+
+            rmp_updated = False
+            for column in generated_columns:
+                rmp_updated = self.master_problem.add_column(column)
+
+            if not rmp_updated:
+                print("RMIP not updated. exiting the loop.")
+                break
+
+        if self.rmp_is_ip:
+            solved = self.master_problem.solve_ip(self.master_ip_solver_params)
+            assert solved, "RMP integer program couldn't be solved."
+
+        self.is_fitted_ = True
+        # Return the classifier
         return self
 
     def predict(self, X):
