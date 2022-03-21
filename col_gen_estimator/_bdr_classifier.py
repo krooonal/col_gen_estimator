@@ -643,14 +643,16 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
                  C=10,
                  p=1,
                  rmp_solver_params="",
+                 rmp_solver="glop",
                  master_ip_solver_params="",
+                 subproblem_solver="cbc",
                  subproblem_params=""):
         super(BooleanDecisionRuleClassifier, self).__init__(
             max_iterations,
             master_problem=BDRMasterProblem(
-                C, p, 'glop'),
+                C, p, rmp_solver),
             subproblem=BDRSubProblem(
-                C, 'cbc'),
+                C, subproblem_solver),
             rmp_is_ip=True,
             rmp_solver_params=rmp_solver_params,
             master_ip_solver_params=master_ip_solver_params,
