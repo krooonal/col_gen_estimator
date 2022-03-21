@@ -504,7 +504,8 @@ class BDRSubProblem(BaseSubproblem):
             if self.y_[i] == 1:
                 for j in range(n_words):
                     if self.X_[i, j] == 0:
-                        cons = self.solver_.Constraint(0, 1, "pos_" + str(i))
+                        cons = self.solver_.Constraint(
+                            0, 1, "pos_" + str(i) + "_" + str(j))
                         z_var = self.solver_.variable(self.z_vars_[j])
                         cons.SetCoefficient(delta_var, 1)
                         cons.SetCoefficient(z_var, 1)
