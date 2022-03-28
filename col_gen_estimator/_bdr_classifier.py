@@ -773,7 +773,8 @@ class BDRHeuristic(BaseSubproblem):
         return []
 
 
-class BooleanDecisionRuleClassifierWithHeuristic(BooleanDecisionRuleClassifier):
+class BooleanDecisionRuleClassifierWithHeuristic(
+        BooleanDecisionRuleClassifier):
     """Binary classifier using boolean decision rule generation method with
     heuristic for column generation.
 
@@ -798,7 +799,7 @@ class BooleanDecisionRuleClassifierWithHeuristic(BooleanDecisionRuleClassifier):
     subproblem_solver: string, default = "cbc",
         Solver used for solving subproblem.
     subproblem_params: list of strings, default = ["",""],
-        Parameters for solving the subproblem. First string is for the 
+        Parameters for solving the subproblem. First string is for the
         heuristic method and the second is for the integer program.
 
     Attributes

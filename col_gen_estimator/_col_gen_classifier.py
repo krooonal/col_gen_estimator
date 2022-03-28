@@ -156,11 +156,11 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
 
             rmp_updated = False
-            sp_index = 0
-            for sp_index in range(len(self.subproblems)):
-                generated_columns = self.subproblems[sp_index].generate_columns(
+            sp_ind = 0
+            for sp_ind in range(len(self.subproblems)):
+                generated_columns = self.subproblems[sp_ind].generate_columns(
                     X, self.processed_y_, dual_costs,
-                    self.subproblem_params[sp_index])
+                    self.subproblem_params[sp_ind])
 
                 rmp_updated = False
                 for column in generated_columns:
