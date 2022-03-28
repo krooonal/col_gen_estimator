@@ -624,9 +624,13 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
         false negatives.
     rmp_solver_params: string, default = "",
         Solver parameters for solving restricted master problem (rmp).
+    rmp_solver: string, default = "glop",
+        Solver used for solving restricted master problem (rmp).
     master_ip_solver_params: string, default = "",
         Solver parameters for solving the integer master problem.
-    subproblem_params: string, default = "",
+    subproblem_solver: string, default = "cbc",
+        Solver used for solving subproblem.
+    subproblem_params: list of strings, default = [""],
         Parameters for solving the subproblem.
 
     Attributes
@@ -646,13 +650,13 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
                  rmp_solver="glop",
                  master_ip_solver_params="",
                  subproblem_solver="cbc",
-                 subproblem_params=""):
+                 subproblem_params=[""]):
         super(BooleanDecisionRuleClassifier, self).__init__(
             max_iterations,
             master_problem=BDRMasterProblem(
                 C, p, rmp_solver),
-            subproblem=BDRSubProblem(
-                C, subproblem_solver),
+            subproblems=[BDRSubProblem(
+                C, subproblem_solver)],
             rmp_is_ip=True,
             rmp_solver_params=rmp_solver_params,
             master_ip_solver_params=master_ip_solver_params,
@@ -661,6 +665,8 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
         # compatibility.
         self.C = C
         self.p = p
+        self.rmp_solver = rmp_solver
+        self.subproblem_solver = subproblem_solver
 
     def _more_tags(self):
         return {'X_types': ['categorical'],
@@ -694,3 +700,139 @@ class BooleanDecisionRuleClassifier(ColGenClassifier):
                     break
         # Translate y back to original form.
         return self.label_encoder_.inverse_transform(y_predict)
+
+
+class BDRHeuristic(BaseSubproblem):
+    """Heuristically generates the new columns to be added to the RMP.
+       Iterates through all size K clauses and returns first one with the
+       negative reduced cost.
+       This extends the BaseSubproblem for column generation classifier.
+
+    Parameters
+    ----------
+    K : int,
+        maximum length of generated clauses.
+
+    Attributes
+    ----------
+
+    """
+
+    def __init__(self, K):
+        self.K_ = K
+
+    def generate_columns(self, X, y, dual_costs, params=""):
+        """Heuristically generates the new columns to be added to the RMP.
+        Iterates through all size 1 clauses and returns first one with the
+        negative reduced cost.
+        In this case instead of directly generating the coefficients, this
+        method returns the list of generated clauses. The Master problem can
+        find the coefficients from it.
+
+        Parameters
+        ----------
+        X : ndarray, shape (n_samples, n_features)
+            The input. The inputs should only contain values in {0,1}.
+        y : ndarray, shape (n_samples,)
+            The labels. The labels should only contain values in {0,1}.
+        dual_costs : tuple(float), size=2
+            Dual costs of constraints (1b) and (1a) in a tuple.
+        params : string, default=""
+            unused parameters.
+        """
+        cc_dual = dual_costs[0]
+        cs_duals = dual_costs[1]
+        # We assume the positive dual cost in this model.
+        assert cc_dual >= 0, "Negative clause complexity dual"
+        for cs_dual in cs_duals:
+            assert cs_dual >= 0, "Negative clause satisfaction dual"
+
+        n_words = X.shape[1]
+        n_samples = X.shape[0]
+        # TODO: Use itertools.
+        # Iterate through all size 1 clause.
+        for i in range(n_words):
+            clause = [i]
+            reduced_cost = cc_dual * (1 + len(clause))
+            pos_ind = -1
+            for j in range(n_samples):
+                target = y[j]
+                if target == 1:
+                    pos_ind += 1
+                satisfied = X[j, i]
+                if satisfied == 0:
+                    continue
+
+                if target == 1:
+                    reduced_cost -= cs_duals[pos_ind]
+                else:
+                    reduced_cost += 1
+            if reduced_cost < -1e-6:
+                return [clause]
+
+        return []
+
+
+class BooleanDecisionRuleClassifierWithHeuristic(BooleanDecisionRuleClassifier):
+    """Binary classifier using boolean decision rule generation method with
+    heuristic for column generation.
+
+    Parameters
+    ----------
+    max_iterations : int, default=-1
+        Maximum column generation iterations. Negative values removes the
+        iteration limit and the problem is solved till optimality.
+    C : int,default=10,
+        A parameter used for controlling the overall complexity of decision
+        rule.
+    p : float,default=1
+        A parameter used for balancing the penalty between false negatives and
+        false positives. Higher value of p would result in more penalty for the
+        false negatives.
+    rmp_solver_params: string, default = "",
+        Solver parameters for solving restricted master problem (rmp).
+    rmp_solver: string, default = "glop",
+        Solver used for solving restricted master problem (rmp).
+    master_ip_solver_params: string, default = "",
+        Solver parameters for solving the integer master problem.
+    subproblem_solver: string, default = "cbc",
+        Solver used for solving subproblem.
+    subproblem_params: list of strings, default = ["",""],
+        Parameters for solving the subproblem. First string is for the 
+        heuristic method and the second is for the integer program.
+
+    Attributes
+    ----------
+    X_ : ndarray, shape (n_samples, n_features)
+        The input passed during :meth:`fit`.
+    y_ : ndarray, shape (n_samples,)
+        The labels passed during :meth:`fit`.
+    classes_ : ndarray, shape (n_classes,)
+        The classes seen at :meth:`fit`.
+    """
+
+    def __init__(self, max_iterations=-1,
+                 C=10,
+                 p=1,
+                 rmp_solver_params="",
+                 rmp_solver="glop",
+                 master_ip_solver_params="",
+                 subproblem_solver="cbc",
+                 subproblem_params=["", ""]):
+        super(BooleanDecisionRuleClassifier, self).__init__(
+            max_iterations,
+            master_problem=BDRMasterProblem(
+                C, p, rmp_solver),
+            subproblems=[BDRHeuristic(K=1),
+                         BDRSubProblem(
+                C, subproblem_solver)],
+            rmp_is_ip=True,
+            rmp_solver_params=rmp_solver_params,
+            master_ip_solver_params=master_ip_solver_params,
+            subproblem_params=subproblem_params)
+        # Not used after this but we have to store them for sklearn
+        # compatibility.
+        self.C = C
+        self.p = p
+        self.rmp_solver = rmp_solver
+        self.subproblem_solver = subproblem_solver

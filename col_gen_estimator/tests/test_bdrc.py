@@ -6,6 +6,7 @@ from numpy.testing import assert_equal
 from numpy.testing import assert_raises
 
 from col_gen_estimator import BooleanDecisionRuleClassifier
+from col_gen_estimator import BooleanDecisionRuleClassifierWithHeuristic
 from col_gen_estimator import BDRMasterProblem
 from col_gen_estimator import BDRSubProblem
 
@@ -37,7 +38,7 @@ def test_default_params():
     assert clf.p == 1
     assert clf.rmp_solver_params == ""
     assert clf.master_ip_solver_params == ""
-    assert clf.subproblem_params == ""
+    assert clf.subproblem_params == [""]
     assert clf.rmp_is_ip
 
 
@@ -60,6 +61,22 @@ def test_fit_predict_one_class(data_one_class):
     clf = BooleanDecisionRuleClassifier(max_iterations=3, C=10, p=1)
     with assert_raises(ValueError):
         clf.fit(data_one_class[0], data_one_class[1])
+
+
+def test_heuristics(data):
+    clf = BooleanDecisionRuleClassifierWithHeuristic(
+        max_iterations=3, C=10, p=1)
+    clf.fit(data[0], data[1])
+    assert hasattr(clf, 'is_fitted_')
+
+    assert hasattr(clf, 'classes_')
+    assert hasattr(clf, 'X_')
+    assert hasattr(clf, 'y_')
+
+    X = data[0]
+    y_pred = clf.predict(X)
+    assert y_pred.shape == (X.shape[0],)
+    assert_array_equal(y_pred, data[1])
 
 
 def test_mp_satisfies_clause():
