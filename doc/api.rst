@@ -13,16 +13,7 @@ Estimator
    :toctree: generated/
    :template: class.rst
 
-   TemplateEstimator
-
-Transformer
-===========
-
-.. autosummary::
-   :toctree: generated/
-   :template: class.rst
-
-   TemplateTransformer
+   BooleanDecisionRuleClassifier
 
 Predictor
 =========
@@ -31,4 +22,4 @@ Predictor
    :toctree: generated/
    :template: class.rst
 
-    TemplateClassifier
+    BooleanDecisionRuleClassifier
