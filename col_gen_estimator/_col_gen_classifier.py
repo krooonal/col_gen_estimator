@@ -87,7 +87,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         Solver parameters for solving restricted master problem (rmp).
     master_ip_solver_params: string, default = "",
         Solver parameters for solving the integer master problem.
-    subproblem_params: string, default = "",
+    subproblem_params: list of string, default = [""],
         Parameters for solving the subproblem.
 
     Attributes
@@ -102,18 +102,19 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
 
     def __init__(self, max_iterations=-1,
                  master_problem=BaseMasterProblem(),
-                 subproblem=BaseSubproblem(),
+                 subproblems=[BaseSubproblem()],
                  rmp_is_ip=False,
                  rmp_solver_params="",
                  master_ip_solver_params="",
-                 subproblem_params=""):
+                 subproblem_params=[""]):
         self.max_iterations = max_iterations
         self.master_problem = master_problem
-        self.subproblem = subproblem
+        self.subproblems = subproblems
         self.rmp_is_ip = rmp_is_ip
         self.rmp_solver_params = rmp_solver_params
         self.master_ip_solver_params = master_ip_solver_params
         self.subproblem_params = subproblem_params
+        assert len(subproblems) == len(subproblem_params)
 
     def fit(self, X, y):
         """Runs the column generation loop.
@@ -151,18 +152,25 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         self.master_problem.generate_mp(X, self.processed_y_)
 
         for iter in range(self.max_iterations):
-            # Solve RMIP
+            print("Column generation iteration: ", iter)
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
 
-            generated_columns = self.subproblem.generate_columns(
-                X, self.processed_y_, dual_costs, self.subproblem_params)
-
             rmp_updated = False
-            for column in generated_columns:
-                rmp_updated = self.master_problem.add_column(column)
+            sp_ind = 0
+            for sp_ind in range(len(self.subproblems)):
+                generated_columns = self.subproblems[sp_ind].generate_columns(
+                    X, self.processed_y_, dual_costs,
+                    self.subproblem_params[sp_ind])
+
+                rmp_updated = False
+                for column in generated_columns:
+                    col_added = self.master_problem.add_column(column)
+                    rmp_updated = rmp_updated or col_added
+                if rmp_updated:
+                    break
 
             if not rmp_updated:
-                print("RMIP not updated. exiting the loop.")
+                print("RMP not updated. exiting the loop.")
                 break
 
         if self.rmp_is_ip:
