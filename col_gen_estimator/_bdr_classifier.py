@@ -725,6 +725,7 @@ class BDRHeuristic(BaseSubproblem):
         """Heuristically generates the new columns to be added to the RMP.
         Iterates through all size 1 clauses and returns first one with the
         negative reduced cost.
+        TODO: Update this to generate all size K columns.
         In this case instead of directly generating the coefficients, this
         method returns the list of generated clauses. The Master problem can
         find the coefficients from it.

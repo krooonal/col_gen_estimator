@@ -9,6 +9,7 @@ from col_gen_estimator import BooleanDecisionRuleClassifier
 from col_gen_estimator import BooleanDecisionRuleClassifierWithHeuristic
 from col_gen_estimator import BDRMasterProblem
 from col_gen_estimator import BDRSubProblem
+from col_gen_estimator import BDRHeuristic
 
 
 @pytest.fixture
@@ -178,4 +179,16 @@ def test_sp_generate_column(data):
     # Call generate again. Only objective should be updated.
     clauses = subproblem.generate_columns(
         data[0], data[1], dual_costs=(0, [0, 0]))
+    assert_array_equal(clauses, [])
+
+
+def test_heuristic_generate_column(data):
+    subproblem = BDRHeuristic(K=1)
+    clauses = subproblem.generate_columns(
+        data[0], data[1], dual_costs=(0, [1, 0]))
+    assert_array_equal(clauses, [[2]])
+
+    # Call generate again.
+    clauses = subproblem.generate_columns(
+        data[0], data[1], dual_costs=(0, [1, 1]))
     assert_array_equal(clauses, [])
