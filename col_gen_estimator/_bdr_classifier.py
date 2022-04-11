@@ -82,6 +82,7 @@ generated.  Note that here the variables delta_i are binary but need not be
 encoded as binary, as it is implied.
 """
 import numpy as np
+import itertools
 from bitarray.util import int2ba
 from ortools.linear_solver import pywraplp
 from ortools.linear_solver import linear_solver_pb2
@@ -723,9 +724,9 @@ class BDRHeuristic(BaseSubproblem):
 
     def generate_columns(self, X, y, dual_costs, params=""):
         """Heuristically generates the new columns to be added to the RMP.
-        Iterates through all size 1 clauses and returns first one with the
+        Iterates through all size K clauses and returns all that have the
         negative reduced cost.
-        TODO: Update this to generate all size K columns.
+
         In this case instead of directly generating the coefficients, this
         method returns the list of generated clauses. The Master problem can
         find the coefficients from it.
@@ -750,28 +751,31 @@ class BDRHeuristic(BaseSubproblem):
 
         n_words = X.shape[1]
         n_samples = X.shape[0]
-        # TODO: Use itertools.
-        # Iterate through all size 1 clause.
-        for i in range(n_words):
-            clause = [i]
-            reduced_cost = cc_dual * (1 + len(clause))
-            pos_ind = -1
-            for j in range(n_samples):
-                target = y[j]
-                if target == 1:
-                    pos_ind += 1
-                satisfied = X[j, i]
-                if satisfied == 0:
-                    continue
+        # Iterate through all size K clause.
+        all_words = range(n_words)
+        neg_red_cost_clauses = []
+        for clause_size in range(1, self.K_+1):
+            clauses = itertools.combinations(all_words, clause_size)
+            for clause in clauses:
+                reduced_cost = cc_dual * (1 + len(clause))
+                pos_ind = -1
+                for j in range(n_samples):
+                    entry = X[j]
+                    target = y[j]
+                    if target == 1:
+                        pos_ind += 1
+                    satisfied = BDRMasterProblem.satisfies_clause(
+                        entry, clause)
+                    if satisfied == 0:
+                        continue
 
-                if target == 1:
-                    reduced_cost -= cs_duals[pos_ind]
-                else:
-                    reduced_cost += 1
-            if reduced_cost < -1e-6:
-                return [clause]
-
-        return []
+                    if target == 1:
+                        reduced_cost -= cs_duals[pos_ind]
+                    else:
+                        reduced_cost += 1
+                if reduced_cost < -1e-6:
+                    neg_red_cost_clauses.append(list(clause))
+        return neg_red_cost_clauses
 
 
 class BooleanDecisionRuleClassifierWithHeuristic(
