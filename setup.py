@@ -16,7 +16,7 @@ URL = 'https://github.com/krooonal/col_gen_estimator'
 LICENSE = 'new BSD'
 DOWNLOAD_URL = 'https://github.com/krooonal/col_gen_estimator'
 VERSION = __version__
-INSTALL_REQUIRES = ['numpy', 'scipy', 'scikit-learn', 'ortools']
+INSTALL_REQUIRES = ['numpy', 'scipy', 'scikit-learn', 'ortools', 'bitarray']
 CLASSIFIERS = ['Intended Audience :: Science/Research',
                'Intended Audience :: Developers',
                'License :: OSI Approved',
