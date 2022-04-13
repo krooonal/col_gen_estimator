@@ -16,7 +16,7 @@ col_gen_estimator - A template for scikit-learn compatible column generation
 based estimators contributions
 ============================================================
 
-**col_gen_estimator** is a template project for scikit-learn_ compatible
+**col_gen_estimator** is a template project for scikit-learn compatible
 column generation based estimators.
 
 This project is built using the sklearn template. 
