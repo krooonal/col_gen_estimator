@@ -98,6 +98,14 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         The labels passed during :meth:`fit`.
     classes_ : ndarray, shape (n_classes,)
         The classes seen at :meth:`fit`.
+    performed_iter_ : int
+        Total number of iterations performed in column generation loop.
+    mp_optimal: bool
+        Set to true if none of the subproblems could generate any column in an
+        iteration.
+    num_col_added_sp_: list of ints (size = number of subproblems)
+        Count of number of columns added to the master problem by each
+        subproblem.
     """
 
     def __init__(self, max_iterations=-1,
@@ -151,8 +159,12 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         # Initiate the master and subproblems
         self.master_problem.generate_mp(X, self.processed_y_)
 
+        self.performed_iter_ = 0
+        self.mp_optimal_ = False
+        self.num_col_added_sp_ = [0]*len(self.subproblems)
+
         for iter in range(self.max_iterations):
-            print("Column generation iteration: ", iter)
+            self.performed_iter_ += 1
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
 
             rmp_updated = False
@@ -165,12 +177,14 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
                 rmp_updated = False
                 for column in generated_columns:
                     col_added = self.master_problem.add_column(column)
+                    self.num_col_added_sp_[sp_ind] += 1 if col_added else 0
                     rmp_updated = rmp_updated or col_added
                 if rmp_updated:
                     break
 
             if not rmp_updated:
                 print("RMP not updated. exiting the loop.")
+                self.mp_optimal_ = True
                 break
 
         if self.rmp_is_ip:

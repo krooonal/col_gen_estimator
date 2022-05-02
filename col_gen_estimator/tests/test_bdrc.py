@@ -51,6 +51,13 @@ def test_fit_predict(data):
     assert hasattr(clf, 'classes_')
     assert hasattr(clf, 'X_')
     assert hasattr(clf, 'y_')
+    assert hasattr(clf, 'mp_optimal_')
+    assert hasattr(clf, 'performed_iter_')
+    assert hasattr(clf, 'num_col_added_sp_')
+
+    assert_equal(clf.mp_optimal_, True)
+    assert_equal(clf.performed_iter_, 2)
+    assert_equal(clf.num_col_added_sp_[0], 1)
 
     X = data[0]
     y_pred = clf.predict(X)
@@ -73,6 +80,14 @@ def test_heuristics(data):
     assert hasattr(clf, 'classes_')
     assert hasattr(clf, 'X_')
     assert hasattr(clf, 'y_')
+    assert hasattr(clf, 'mp_optimal_')
+    assert hasattr(clf, 'performed_iter_')
+    assert hasattr(clf, 'num_col_added_sp_')
+
+    assert_equal(clf.mp_optimal_, True)
+    assert_equal(clf.performed_iter_, 3)
+    assert_equal(clf.num_col_added_sp_[0], 2)
+    assert_equal(clf.num_col_added_sp_[1], 1)
 
     X = data[0]
     y_pred = clf.predict(X)
