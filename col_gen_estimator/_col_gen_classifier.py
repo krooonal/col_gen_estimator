@@ -98,7 +98,14 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         The labels passed during :meth:`fit`.
     classes_ : ndarray, shape (n_classes,)
         The classes seen at :meth:`fit`.
-    stats_ : Column generation stats.
+    performed_iter_ : int
+        Total number of iterations performed in column generation loop.
+    mp_optimal: bool
+        Set to true if none of the subproblems could generate any column in an
+        iteration.
+    num_col_added_sp_: list of ints (size = number of subproblems)
+        Count of number of columns added to the master problem by each
+        subproblem.
     """
 
     def __init__(self, max_iterations=-1,
