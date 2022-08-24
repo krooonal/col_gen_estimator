@@ -178,23 +178,25 @@ class DTreeMasterProblem(BaseMasterProblem):
                 for split in node.candidate_splits:
 
                     ns_constraint = self.solver_.Constraint(
-                        0, 0, "ns_"+str(node.id)+"_"+str(split)+"_"+str(l.id))
+                        0, 0, "ns_"+str(node.id)+"_"+str(split)+"_"
+                        + str(leaf.id))
 
                     dummy_var = self.solver_.BoolVar("r_ns_" +
                                                      str(node.id) +
                                                      "_"+str(split) +
-                                                     "_"+str(l.id))
+                                                     "_"+str(leaf.id))
                     ns_constraint.SetCoefficient(dummy_var, -1)
 
                     for path in self.paths_:
                         for i in range(len(path.node_ids)):
-                            if path.leaf_id == l.id\
+                            if path.leaf_id == leaf.id\
                                 and path.node_ids[i] == node.id \
                                     and path.splits[i] == split:
                                 xp_var = self.solver_.variable(path.id)
                                 ns_constraint.SetCoefficient(xp_var, 1)
 
-                    self.ns_constraints_[l.id][node.id][split] = ns_constraint
+                    self.ns_constraints_[
+                        leaf.id][node.id][split] = ns_constraint
         # print(self.solver_.ExportModelAsLpFormat(False))
         self.generated_ = True
 
