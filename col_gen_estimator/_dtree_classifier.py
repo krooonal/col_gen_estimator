@@ -27,7 +27,7 @@ class Path:
 
     def set_leaf(self, leaf_id, depth):
         """TODO: Documentation.
-        For a full binary tree, adds the nodes corresponding to the given 
+        For a full binary tree, adds the nodes corresponding to the given
         leaf_id."""
         self.leaf_id = leaf_id
         self.node_ids = []
@@ -148,13 +148,13 @@ class DTreeMasterProblem(BaseMasterProblem):
 
         # leaf constraints
         self.leaf_cons_ = [None]*len(self.leaves_)
-        for l in self.leaves_:
-            self.leaf_cons_[l.id] = self.solver_.Constraint(
-                1, 1, "leaf_"+str(l.id))
+        for leaf in self.leaves_:
+            self.leaf_cons_[leaf.id] = self.solver_.Constraint(
+                1, 1, "leaf_"+str(leaf.id))
             for path in self.paths_:
-                if path.leaf_id == l.id:
+                if path.leaf_id == leaf.id:
                     xp_var = self.solver_.variable(path.id)
-                    self.leaf_cons_[l.id].SetCoefficient(xp_var, 1)
+                    self.leaf_cons_[leaf.id].SetCoefficient(xp_var, 1)
 
         # row constraints
         n_rows = self.X_.shape[0]
@@ -169,12 +169,12 @@ class DTreeMasterProblem(BaseMasterProblem):
 
         # consistency constraints
         self.ns_constraints_ = {}
-        for l in self.leaves_:
-            self.ns_constraints_[l.id] = {}
-            nodes = l.left_nodes + l.right_nodes
+        for leaf in self.leaves_:
+            self.ns_constraints_[leaf.id] = {}
+            nodes = leaf.left_nodes + leaf.right_nodes
             for node_id in nodes:
                 node = self.nodes_[node_id]
-                self.ns_constraints_[l.id][node.id] = {}
+                self.ns_constraints_[leaf.id][node.id] = {}
                 for split in node.candidate_splits:
 
                     ns_constraint = self.solver_.Constraint(
@@ -211,9 +211,9 @@ class DTreeMasterProblem(BaseMasterProblem):
         self.paths_.append(path)
 
         # leaf constraints
-        for l in self.leaves_:
-            if path.leaf_id == l.id:
-                self.leaf_cons_[l.id].SetCoefficient(xp_var, 1)
+        for leaf in self.leaves_:
+            if path.leaf_id == leaf.id:
+                self.leaf_cons_[leaf.id].SetCoefficient(xp_var, 1)
 
         # row constraints
         n_rows = self.X_.shape[0]
@@ -223,16 +223,17 @@ class DTreeMasterProblem(BaseMasterProblem):
                 self.row_cons_[r].SetCoefficient(xp_var, 1)
 
         # consistency constraints
-        for l in self.leaves_:
-            nodes = l.left_nodes + l.right_nodes
+        for leaf in self.leaves_:
+            nodes = leaf.left_nodes + leaf.right_nodes
             for node_id in nodes:
                 node = self.nodes_[node_id]
                 for split in node.candidate_splits:
 
-                    ns_constraint = self.ns_constraints_[l.id][node.id][split]
+                    ns_constraint = self.ns_constraints_[
+                        leaf.id][node.id][split]
 
                     for i in range(len(path.node_ids)):
-                        if path.leaf_id == l.id\
+                        if path.leaf_id == leaf.id\
                             and path.node_ids[i] == node.id \
                                 and path.splits[i] == split:
                             ns_constraint.SetCoefficient(xp_var, 1)
@@ -268,15 +269,16 @@ class DTreeMasterProblem(BaseMasterProblem):
                 row_duals.append(self.row_cons_[r].dual_value())
 
             ns_duals = {}
-            for l in self.leaves_:
-                ns_duals[l.id] = {}
-                nodes = l.left_nodes + l.right_nodes
+            for leaf in self.leaves_:
+                ns_duals[leaf.id] = {}
+                nodes = leaf.left_nodes + leaf.right_nodes
                 for node_id in nodes:
                     node = self.nodes_[node_id]
-                    ns_duals[l.id][node.id] = {}
+                    ns_duals[leaf.id][node.id] = {}
                     for split in node.candidate_splits:
-                        ns_duals[l.id][node.id][split] = self.ns_constraints_[
-                            l.id][node.id][split].dual_value()
+                        ns_duals[leaf.id][node.id][split] = \
+                            self.ns_constraints_[
+                            leaf.id][node.id][split].dual_value()
 
         return (leaf_duals, row_duals, ns_duals)
 
@@ -327,7 +329,8 @@ class DTreeMasterProblem(BaseMasterProblem):
 class DTreeSubProblem(BaseSubproblem):
     """TODO: Documentation."""
 
-    def __init__(self, leaf, nodes, splits, targets, depth, optimization_problem_type='cbc') -> None:
+    def __init__(self, leaf, nodes, splits, targets,
+                 depth, optimization_problem_type='cbc') -> None:
         super().__init__()
         self.leaf_id_ = leaf.id
         self.leaf_ = leaf
@@ -422,7 +425,8 @@ class DTreeSubProblem(BaseSubproblem):
                             y_lb_cons.SetCoefficient(u_var, 1)
                 elif node.id in self.leaf_.right_nodes:
                     for split in node.candidate_splits:
-                        if not self.row_satisfies_split(i, self.splits_[split]):
+                        if not self.row_satisfies_split(i,
+                                                        self.splits_[split]):
                             u_var = self.solver_.variable(
                                 self.u_vars_[node.id][split])
                             rn_cons.SetCoefficient(u_var, -1)

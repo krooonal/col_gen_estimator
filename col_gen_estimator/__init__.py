@@ -7,7 +7,8 @@ from ._bdr_classifier import BDRHeuristic
 from ._bdr_classifier import BooleanDecisionRuleClassifier
 from ._bdr_classifier import BooleanDecisionRuleClassifierWithHeuristic
 from ._dtree_classifier import Path, Node, Split, Leaf
-from ._dtree_classifier import DTreeMasterProblem, DTreeSubProblem, DTreeClassifier
+from ._dtree_classifier import DTreeMasterProblem, DTreeSubProblem
+from ._dtree_classifier import DTreeClassifier
 
 from ._version import __version__
 
