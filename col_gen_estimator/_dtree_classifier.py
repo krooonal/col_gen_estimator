@@ -14,6 +14,9 @@ from ._col_gen_classifier import ColGenClassifier
 
 
 class Path:
+    """TODO: Documentation.
+    """
+
     def __init__(self) -> None:
         self.leaf_id = -1
         self.node_ids = []
@@ -23,6 +26,9 @@ class Path:
         self.target = -1
 
     def set_leaf(self, leaf_id, depth):
+        """TODO: Documentation.
+        For a full binary tree, adds the nodes corresponding to the given 
+        leaf_id."""
         self.leaf_id = leaf_id
         self.node_ids = []
         count = 2**(depth) - 1 + leaf_id
@@ -33,18 +39,26 @@ class Path:
 
 
 class Node:
+    """TODO: Documentation.
+    """
+
     def __init__(self) -> None:
         self.id = -1
         self.candidate_splits = []
 
 
 class Leaf:
+    """TODO: Documentation.
+    """
+
     def __init__(self) -> None:
         self.id = id
         self.left_nodes = []
         self.right_nodes = []
 
     def create_leaf(self, id, depth) -> None:
+        """TODO: Documentation.
+        """
         self.id = id
         self.left_nodes = []
         self.right_nodes = []
@@ -59,6 +73,9 @@ class Leaf:
 
 
 class Split:
+    """TODO: Documentation.
+    """
+
     def __init__(self) -> None:
         self.id = -1
         self.feature = -1
@@ -66,6 +83,8 @@ class Split:
 
 
 def row_satisfies_path(X, leaf, splits, row, path):
+    """TODO: Documentation.
+    """
     split_ids = path.splits
     node_ids = path.node_ids
     for i in range(len(node_ids)):
@@ -95,6 +114,9 @@ def get_params_from_string(params):
 
 
 class DTreeMasterProblem(BaseMasterProblem):
+    """TODO: Documentation.
+    """
+
     def __init__(self, initial_paths, leaves, nodes, splits):
         super().__init__()
         self.solver_ = pywraplp.Solver.CreateSolver('glop')
@@ -105,6 +127,8 @@ class DTreeMasterProblem(BaseMasterProblem):
         self.splits_ = splits
 
     def generate_mp(self, X, y):
+        """TODO: Documentation.
+        """
         if self.generated_:
             return
 
@@ -175,6 +199,8 @@ class DTreeMasterProblem(BaseMasterProblem):
         self.generated_ = True
 
     def add_column(self, path):
+        """TODO: Documentation.
+        """
         objective = self.solver_.Objective()
         infinity = self.solver_.infinity()
         xp_var = self.solver_.IntVar(
@@ -213,6 +239,8 @@ class DTreeMasterProblem(BaseMasterProblem):
         return True
 
     def solve_rmp(self, solver_params=''):
+        """TODO: Documentation.
+        """
         assert self.generated_
 
         result_status = self.solver_.Solve(
@@ -297,6 +325,8 @@ class DTreeMasterProblem(BaseMasterProblem):
 
 
 class DTreeSubProblem(BaseSubproblem):
+    """TODO: Documentation."""
+
     def __init__(self, leaf, nodes, splits, targets, depth, optimization_problem_type='cbc') -> None:
         super().__init__()
         self.leaf_id_ = leaf.id
@@ -310,7 +340,7 @@ class DTreeSubProblem(BaseSubproblem):
         self.z_vars_ = None
 
     def create_submip(self, leaf_dual, row_duals, ns_duals):
-        """
+        """TODO: Documentation.
         """
         assert not self.generated_, "SP is already created."
         infinity = self.solver_.infinity()
@@ -422,6 +452,8 @@ class DTreeSubProblem(BaseSubproblem):
         self.generated_ = True
 
     def update_objective(self, leaf_dual, row_duals, ns_duals):
+        """TODO: Documentation.
+        """
         objective = self.solver_.Objective()
         n_rows = self.X_.shape[0]
         for i in range(n_rows):
@@ -445,6 +477,8 @@ class DTreeSubProblem(BaseSubproblem):
         return
 
     def generate_columns(self, X, y, dual_costs, params=""):
+        """TODO: Documentation.
+        """
         self.X_ = X
         self.y_ = y
         leaf_dual = dual_costs[0][self.leaf_id_]
@@ -505,6 +539,8 @@ class DTreeSubProblem(BaseSubproblem):
         return [path]
 
     def row_satisfies_split(self, row, split):
+        """TODO: Documentation.
+        """
         feature = split.feature
         threshold = split.threshold
         if self.X_[row, feature] <= threshold:
@@ -513,6 +549,9 @@ class DTreeSubProblem(BaseSubproblem):
 
 
 class DTreeClassifier(ColGenClassifier):
+    """TODO: Documentation.
+    """
+
     def __init__(self, initial_paths, leaves, nodes, splits, depth,
                  targets, max_iterations=-1, rmp_is_ip=True,
                  rmp_solver_params="",
@@ -566,11 +605,15 @@ class DTreeClassifier(ColGenClassifier):
                          subproblem_params)
 
     def _more_tags(self):
+        """TODO: Documentation.
+        """
         return {'X_types': ['categorical'],
                 'non_deterministic': True,
                 'binary_only': True}
 
     def predict(self, X):
+        """TODO: Documentation.
+        """
         selected_paths = self.master_problem.selected_paths
         # Check for each row, which path it satisfies. There should be exactly
         # one.
