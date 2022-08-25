@@ -254,7 +254,6 @@ class DTreeMasterProblem(BaseMasterProblem):
         print('Number of variables RMIP = %d' % self.solver_.NumVariables())
         print('Number of constraints RMIP = %d' %
               self.solver_.NumConstraints())
-        print(result_status)
         if result_status == pywraplp.Solver.OPTIMAL:
             print('RMP Optimal objective value = %f' %
                   self.solver_.Objective().Value())
@@ -282,6 +281,9 @@ class DTreeMasterProblem(BaseMasterProblem):
                         ns_duals[leaf.id][node.id][split] = \
                             self.ns_constraints_[
                             leaf.id][node.id][split].dual_value()
+        else:
+            print(result_status)
+            print(self.solver_.ExportModelAsLpFormat(False))
 
         return (leaf_duals, row_duals, ns_duals)
 
