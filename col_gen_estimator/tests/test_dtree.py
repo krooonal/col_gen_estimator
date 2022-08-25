@@ -357,7 +357,7 @@ def test_fit_predict(data):
     leaves = data[4]
     splits = data[5]
     clf = DTreeClassifier(paths, leaves, nodes, splits,
-                          depth=2, targets=[0, 1], max_iterations=3)
+                          tree_depth=2, targets=[0, 1], max_iterations=3)
     clf.fit(X, y)
     assert hasattr(clf, 'is_fitted_')
     assert hasattr(clf, 'classes_')
