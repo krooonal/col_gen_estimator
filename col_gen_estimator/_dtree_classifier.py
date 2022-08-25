@@ -511,7 +511,7 @@ class DTreeSubProblem(BaseSubproblem):
                         result_status == pywraplp.Solver.FEASIBLE)
         assert has_solution
 
-        print(self.solver_.ExportModelAsLpFormat(False))
+        # print(self.solver_.ExportModelAsLpFormat(False))
 
         # TODO: This threshold should be a parameter.
         print(self.solver_.Objective().Value())
@@ -561,16 +561,18 @@ class DTreeClassifier(ColGenClassifier):
     """TODO: Documentation.
     """
 
-    def __init__(self, initial_paths, leaves, nodes, splits, depth,
-                 targets, max_iterations=-1, rmp_is_ip=True,
+    def __init__(self, initial_paths=[], leaves=[], nodes=[], splits=[],
+                 tree_depth=1,
+                 targets=[], max_iterations=-1, rmp_is_ip=True,
                  rmp_solver_params="",
                  master_ip_solver_params="", subproblem_param_str=""):
 
         self.leaves_ = leaves
+        self.initial_paths_ = initial_paths
         self.nodes_ = nodes
         self.splits_ = splits
         self.targets_ = targets
-        self.tree_depth_ = depth
+        self.tree_depth_ = tree_depth
         split_ids = []
         for split in splits:
             split_ids.append(split.id)
@@ -590,23 +592,23 @@ class DTreeClassifier(ColGenClassifier):
             leaf_ids.append(leaf.id)
             leaf_id += 1
         # Each path can only contain nodes and leaves provided.
-        for path in initial_paths:
+        for path in self.initial_paths_:
             assert path.leaf_id in leaf_ids
             for node_id in path.node_ids:
                 assert node_id in node_ids
             for split_id in path.splits:
                 assert split_id in split_ids
             assert path.target in targets
-            assert len(path.node_ids) == depth
-            assert len(path.splits) == depth
+            assert len(path.node_ids) == self.tree_depth_
+            assert len(path.splits) == self.tree_depth_
 
         self.master_problem = DTreeMasterProblem(
-            initial_paths, leaves, nodes, splits)
+            self.initial_paths_, leaves, nodes, splits)
         self.subproblems = []
         subproblem_params = []
         for leaf in leaves:
             subproblem = DTreeSubProblem(
-                leaf, nodes, splits, targets, depth, 'cbc')
+                leaf, nodes, splits, targets, self.tree_depth_, 'cbc')
             self.subproblems.append(subproblem)
             subproblem_params.append(subproblem_param_str)
         super().__init__(max_iterations, self.master_problem, self.subproblems,
