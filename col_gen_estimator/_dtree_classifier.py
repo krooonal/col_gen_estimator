@@ -254,6 +254,7 @@ class DTreeMasterProblem(BaseMasterProblem):
         print('Number of variables RMIP = %d' % self.solver_.NumVariables())
         print('Number of constraints RMIP = %d' %
               self.solver_.NumConstraints())
+        print(result_status)
         if result_status == pywraplp.Solver.OPTIMAL:
             print('RMP Optimal objective value = %f' %
                   self.solver_.Objective().Value())
