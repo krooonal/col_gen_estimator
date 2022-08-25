@@ -514,7 +514,7 @@ class DTreeSubProblem(BaseSubproblem):
         # print(self.solver_.ExportModelAsLpFormat(False))
 
         # TODO: This threshold should be a parameter.
-        print(self.solver_.Objective().Value())
+        print("Subproblem objective = ", self.solver_.Objective().Value())
         if self.solver_.Objective().Value() <= 1e-6:
             return []
 
@@ -567,12 +567,12 @@ class DTreeClassifier(ColGenClassifier):
                  rmp_solver_params="",
                  master_ip_solver_params="", subproblem_param_str=""):
 
-        self.leaves_ = leaves
-        self.initial_paths_ = initial_paths
-        self.nodes_ = nodes
-        self.splits_ = splits
-        self.targets_ = targets
-        self.tree_depth_ = tree_depth
+        self.initial_paths = initial_paths
+        self.leaves = leaves
+        self.nodes = nodes
+        self.splits = splits
+        self.tree_depth = tree_depth
+        self.targets = targets
         split_ids = []
         for split in splits:
             split_ids.append(split.id)
@@ -592,23 +592,23 @@ class DTreeClassifier(ColGenClassifier):
             leaf_ids.append(leaf.id)
             leaf_id += 1
         # Each path can only contain nodes and leaves provided.
-        for path in self.initial_paths_:
+        for path in self.initial_paths:
             assert path.leaf_id in leaf_ids
             for node_id in path.node_ids:
                 assert node_id in node_ids
             for split_id in path.splits:
                 assert split_id in split_ids
             assert path.target in targets
-            assert len(path.node_ids) == self.tree_depth_
-            assert len(path.splits) == self.tree_depth_
+            assert len(path.node_ids) == self.tree_depth
+            assert len(path.splits) == self.tree_depth
 
         self.master_problem = DTreeMasterProblem(
-            self.initial_paths_, leaves, nodes, splits)
+            self.initial_paths, leaves, nodes, splits)
         self.subproblems = []
         subproblem_params = []
         for leaf in leaves:
             subproblem = DTreeSubProblem(
-                leaf, nodes, splits, targets, self.tree_depth_, 'cbc')
+                leaf, nodes, splits, targets, self.tree_depth, 'cbc')
             self.subproblems.append(subproblem)
             subproblem_params.append(subproblem_param_str)
         super().__init__(max_iterations, self.master_problem, self.subproblems,
@@ -632,8 +632,8 @@ class DTreeClassifier(ColGenClassifier):
         y_predict = np.zeros(X.shape[0], dtype=int)
         for row in range(num_rows):
             for path in selected_paths:
-                if row_satisfies_path(X, self.leaves_[path.leaf_id],
-                                      self.splits_, row, path):
+                if row_satisfies_path(X, self.leaves[path.leaf_id],
+                                      self.splits, row, path):
                     y_predict[row] = path.target
                     break
         return self.label_encoder_.inverse_transform(y_predict)
