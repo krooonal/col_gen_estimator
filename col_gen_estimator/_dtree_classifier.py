@@ -565,7 +565,7 @@ class DTreeClassifier(ColGenClassifier):
                  tree_depth=1,
                  targets=[], max_iterations=-1, rmp_is_ip=True,
                  rmp_solver_params="",
-                 master_ip_solver_params="", subproblem_param_str=""):
+                 master_ip_solver_params="", subproblem_params=""):
 
         self.initial_paths = initial_paths
         self.leaves = leaves
@@ -573,6 +573,7 @@ class DTreeClassifier(ColGenClassifier):
         self.splits = splits
         self.tree_depth = tree_depth
         self.targets = targets
+        self.subproblem_params = subproblem_params
         split_ids = []
         for split in splits:
             split_ids.append(split.id)
@@ -605,15 +606,15 @@ class DTreeClassifier(ColGenClassifier):
         self.master_problem = DTreeMasterProblem(
             self.initial_paths, leaves, nodes, splits)
         self.subproblems = []
-        subproblem_params = []
+        all_subproblem_params = []
         for leaf in leaves:
             subproblem = DTreeSubProblem(
                 leaf, nodes, splits, targets, self.tree_depth, 'cbc')
             self.subproblems.append(subproblem)
-            subproblem_params.append(subproblem_param_str)
+            all_subproblem_params.append(subproblem_params)
         super().__init__(max_iterations, self.master_problem, self.subproblems,
                          rmp_is_ip, rmp_solver_params, master_ip_solver_params,
-                         subproblem_params)
+                         all_subproblem_params)
 
     def _more_tags(self):
         """TODO: Documentation.
