@@ -53,6 +53,70 @@ def test_path_set_leaf():
     assert_equal(path.leaf_id, 3)
 
 
+def test_path_is_same_as():
+    path = Path()
+    path.leaf_id = 0
+    path.node_ids = [1, 0]
+    path.splits = [2, 0]
+    path.cost = 1
+    path.target = 1
+    assert(path.is_same_as(path))
+
+    path2 = Path()
+    path2.leaf_id = 0
+    path2.node_ids = [0, 1]
+    path2.splits = [0, 2]
+    path2.cost = 1
+    path2.target = 1
+    assert(path.is_same_as(path2))
+    assert(path2.is_same_as(path))
+
+    # Different leaf
+    path2 = Path()
+    path2.leaf_id = 1
+    path2.node_ids = [0, 1]
+    path2.splits = [0, 2]
+    path2.cost = 1
+    path2.target = 1
+    assert(not path.is_same_as(path2))
+
+    # Different target
+    path2 = Path()
+    path2.leaf_id = 0
+    path2.node_ids = [0, 1]
+    path2.splits = [0, 2]
+    path2.cost = 1
+    path2.target = 0
+    assert(not path.is_same_as(path2))
+
+    # Different cost
+    path2 = Path()
+    path2.leaf_id = 0
+    path2.node_ids = [0, 1]
+    path2.splits = [0, 2]
+    path2.cost = 3
+    path2.target = 1
+    assert(not path.is_same_as(path2))
+
+    # Different node length
+    path2 = Path()
+    path2.leaf_id = 0
+    path2.node_ids = [0, 1, 2]
+    path2.splits = [0, 2, 3]
+    path2.cost = 1
+    path2.target = 1
+    assert(not path.is_same_as(path2))
+
+    # Different splits
+    path2 = Path()
+    path2.leaf_id = 0
+    path2.node_ids = [0, 1]
+    path2.splits = [2, 0]
+    path2.cost = 1
+    path2.target = 1
+    assert(not path.is_same_as(path2))
+
+
 @pytest.fixture
 def data():
     X = np.array([[1, 1, 1],

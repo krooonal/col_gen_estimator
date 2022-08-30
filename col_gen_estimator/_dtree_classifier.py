@@ -619,12 +619,11 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
             node_ids = leaf.left_nodes + leaf.right_nodes
             path.node_ids = node_ids
             path.splits = []
-            used_splits = []
             success = True
             for node_id in node_ids:
                 node = self.nodes_[node_id]
                 candidate_splits = node.candidate_splits
-                for used_split in used_splits:
+                for used_split in path.splits:
                     if used_split in candidate_splits:
                         candidate_splits.remove(used_split)
                 if not candidate_splits:
