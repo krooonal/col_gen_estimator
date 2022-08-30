@@ -22,7 +22,8 @@ from col_gen_estimator import Path
 
 def main():
     # Load data from URL using pandas read_csv method
-    link = 'http://archive.ics.uci.edu/ml/machine-learning-databases/tic-tac-toe/tic-tac-toe.data'
+    link = 'http://archive.ics.uci.edu/ml/machine-learning-databases/' + \
+        'tic-tac-toe/tic-tac-toe.data'
     df = pd.read_csv(link,
                      header=None,
                      names=["TopLeft", "TopMiddle", "TopRight",
