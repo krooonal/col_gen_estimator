@@ -1,12 +1,13 @@
 import pytest
 import numpy as np
+import random
 
 from numpy.testing import assert_array_equal
 from numpy.testing import assert_equal
-from numpy.testing import assert_raises
 
 from col_gen_estimator import DTreeMasterProblem
 from col_gen_estimator import DTreeSubProblem
+from col_gen_estimator import DTreeSubProblemHeuristic
 from col_gen_estimator import DTreeClassifier
 from col_gen_estimator import Split
 from col_gen_estimator import Node
@@ -37,19 +38,19 @@ def test_path_set_leaf():
     path = Path()
     path.set_leaf(0, 2)
     assert_array_equal(path.node_ids, [1, 0])
-    assert(path.leaf_id, 0)
+    assert_equal(path.leaf_id, 0)
 
     path.set_leaf(1, 2)
     assert_array_equal(path.node_ids, [1, 0])
-    assert(path.leaf_id, 1)
+    assert_equal(path.leaf_id, 1)
 
     path.set_leaf(2, 2)
     assert_array_equal(path.node_ids, [2, 0])
-    assert(path.leaf_id, 2)
+    assert_equal(path.leaf_id, 2)
 
     path.set_leaf(3, 2)
     assert_array_equal(path.node_ids, [2, 0])
-    assert(path.leaf_id, 3)
+    assert_equal(path.leaf_id, 3)
 
 
 @pytest.fixture
@@ -172,7 +173,7 @@ def test_master_prob(data):
     master_problem.generate_mp(X, y)
     assert_equal(master_problem.generated_, True)
     duals = master_problem.solve_rmp()
-    assert(len(duals), 3)
+    assert_equal(len(duals), 3)
     leaf_duals = duals[0]
     row_duals = duals[1]
     ns_duals = duals[2]
@@ -194,7 +195,7 @@ def test_master_prob_add_col(data):
     master_problem.generate_mp(X, y)
     assert_equal(master_problem.generated_, True)
     duals = master_problem.solve_rmp()
-    assert(len(duals), 3)
+    assert_equal(len(duals), 3)
     leaf_duals = duals[0]
     row_duals = duals[1]
     ns_duals = duals[2]
@@ -214,7 +215,7 @@ def test_master_prob_add_col(data):
     path_7 = data[2][-1]
     master_problem.add_column(path_7)
     duals = master_problem.solve_rmp()
-    assert(len(duals), 3)
+    assert_equal(len(duals), 3)
     leaf_duals = duals[0]
     row_duals = duals[1]
     ns_duals = duals[2]
@@ -227,7 +228,6 @@ def test_master_prob_add_col(data):
 def test_subproblem(data):
     X = data[0]
     y = data[1]
-    paths = data[2]
     nodes = data[3]
     leaves = data[4]
     splits = data[5]
@@ -260,7 +260,6 @@ def test_subproblem(data):
 def test_subproblem2(data):
     X = data[0]
     y = data[1]
-    paths = data[2]
     nodes = data[3]
     leaves = data[4]
     splits = data[5]
@@ -287,7 +286,6 @@ def test_subproblem2(data):
 def test_subproblem3(data):
     X = data[0]
     y = data[1]
-    paths = data[2]
     nodes = data[3]
     leaves = data[4]
     splits = data[5]
@@ -297,8 +295,6 @@ def test_subproblem3(data):
     leaf_duals = [1, 0, 0, 0]
     row_duals = [0, 0, 1, 0, 0, 1, 0, 0]
     ns_duals = {}
-    for node in nodes:
-        print(node.candidate_splits)
 
     ns_duals[2] = {}
     two_nodes = leaves[2].left_nodes + leaves[2].right_nodes
@@ -317,7 +313,6 @@ def test_subproblem3(data):
 def test_subproblem4(data):
     X = data[0]
     y = data[1]
-    paths = data[2]
     nodes = data[3]
     leaves = data[4]
     splits = data[5]
@@ -327,13 +322,11 @@ def test_subproblem4(data):
     leaf_duals = [1, 0, 0, 0]
     row_duals = [0, 0, 1, 0, 0, 1, 0, 0]
     ns_duals = {}
-    for node in nodes:
-        print(node.candidate_splits)
 
     ns_duals[3] = {}
-    two_nodes = leaves[3].left_nodes + leaves[3].right_nodes
+    three_nodes = leaves[3].left_nodes + leaves[3].right_nodes
     for node in nodes:
-        if node.id not in two_nodes:
+        if node.id not in three_nodes:
             continue
         ns_duals[3][node.id] = {}
         for split_id in node.candidate_splits:
@@ -345,6 +338,79 @@ def test_subproblem4(data):
     assert_equal(path.leaf_id, 3)
     assert_array_equal(path.node_ids, [0, 2])
     assert_array_equal(path.splits, [0, 1])
+    assert_equal(path.cost, 2)
+    assert_equal(path.target, 1)
+
+
+def test_get_reduced_cost(data):
+    X = data[0]
+    y = data[1]
+    nodes = data[3]
+    leaves = data[4]
+    splits = data[5]
+    targets = data[6]
+    subproblem_heuristic = DTreeSubProblemHeuristic(
+        leaves, nodes, splits, targets, depth=2)
+
+    leaf_duals = [1, 0, 0, 0]
+    row_duals = [0, 0, 1, 0, 0, 1, 0, 0]
+    ns_duals = {}
+
+    for leaf_id in range(len(leaves)):
+        ns_duals[leaf_id] = {}
+        leaf_nodes = leaves[leaf_id].left_nodes + leaves[leaf_id].right_nodes
+        for node in nodes:
+            if node.id not in leaf_nodes:
+                continue
+            ns_duals[leaf_id][node.id] = {}
+            for split_id in node.candidate_splits:
+                ns_duals[leaf_id][node.id][split_id] = 0.0
+    ns_duals[2][0][0] = 1.0
+    ns_duals[1][1][2] = 2.0
+    duals = (leaf_duals, row_duals, ns_duals)
+    path = Path()
+    path.leaf_id = 3
+    path.node_ids = [0, 2]
+    path.splits = [0, 1]
+    path.cost = 2
+    path.target = 1
+    reduced_cost = subproblem_heuristic.get_reduced_cost(X, y, duals, path)
+    assert(reduced_cost > 1e-6)
+
+
+def test_subproblem_heuristic1(data):
+    X = data[0]
+    y = data[1]
+    nodes = data[3]
+    leaves = data[4]
+    splits = data[5]
+    targets = data[6]
+    subproblem = DTreeSubProblemHeuristic(
+        leaves, nodes, splits, targets, depth=2)
+
+    leaf_duals = [1, 0, 0, 0]
+    row_duals = [0, 0, 1, 0, 0, 1, 0, 0]
+    ns_duals = {}
+
+    for leaf_id in range(len(leaves)):
+        ns_duals[leaf_id] = {}
+        leaf_nodes = leaves[leaf_id].left_nodes + leaves[leaf_id].right_nodes
+        for node in nodes:
+            if node.id not in leaf_nodes:
+                continue
+            ns_duals[leaf_id][node.id] = {}
+            for split_id in node.candidate_splits:
+                ns_duals[leaf_id][node.id][split_id] = 0.0
+    ns_duals[2][0][0] = 1.0
+    ns_duals[1][1][2] = 2.0
+    duals = (leaf_duals, row_duals, ns_duals)
+    random.seed(10)
+    new_paths = subproblem.generate_columns(X, y, duals)
+    assert_equal(len(new_paths), 1)
+    path = new_paths[0]
+    assert_equal(path.leaf_id, 3)
+    assert_array_equal(path.node_ids, [2, 0])
+    assert_array_equal(path.splits, [1, 0])
     assert_equal(path.cost, 2)
     assert_equal(path.target, 1)
 
@@ -369,10 +435,11 @@ def test_fit_predict(data):
 
     assert_equal(clf.mp_optimal_, True)
     assert_equal(clf.performed_iter_, 2)
-    assert_equal(clf.num_col_added_sp_[0], 0)
+    assert_equal(clf.num_col_added_sp_[0], 1)
     assert_equal(clf.num_col_added_sp_[1], 0)
     assert_equal(clf.num_col_added_sp_[2], 0)
-    assert_equal(clf.num_col_added_sp_[3], 1)
+    assert_equal(clf.num_col_added_sp_[3], 0)
+    assert_equal(clf.num_col_added_sp_[4], 0)
 
     y_pred = clf.predict(X)
     assert y_pred.shape == (X.shape[0],)

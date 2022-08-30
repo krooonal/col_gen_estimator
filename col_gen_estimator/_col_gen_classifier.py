@@ -164,6 +164,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         self.num_col_added_sp_ = [0]*len(self.subproblems)
 
         for iter in range(self.max_iterations):
+            print("Iteration number: ", iter+1)
             self.performed_iter_ += 1
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
 

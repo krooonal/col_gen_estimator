@@ -9,6 +9,7 @@ from ._bdr_classifier import BooleanDecisionRuleClassifierWithHeuristic
 from ._dtree_classifier import Path, Node, Split, Leaf
 from ._dtree_classifier import DTreeMasterProblem, DTreeSubProblem
 from ._dtree_classifier import DTreeClassifier
+from ._dtree_classifier import DTreeSubProblemHeuristic
 
 from ._version import __version__
 
@@ -17,6 +18,6 @@ __all__ = ['BaseMasterProblem', 'BaseSubproblem', 'ColGenClassifier',
            'BooleanDecisionRuleClassifier',
            'BooleanDecisionRuleClassifierWithHeuristic',
            'Path', 'Node', 'Split', 'Leaf',
-           'DTreeMasterProblem', 'DTreeSubProblem',
+           'DTreeMasterProblem', 'DTreeSubProblem', 'DTreeSubProblemHeuristic',
            'DTreeClassifier',
            '__version__']
