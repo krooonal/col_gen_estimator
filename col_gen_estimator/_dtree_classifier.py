@@ -3,8 +3,7 @@ TODO: Documentation of the file.
 """
 import numpy as np
 import math
-import itertools
-from bitarray.util import int2ba
+import random
 from ortools.linear_solver import pywraplp
 from ortools.linear_solver import linear_solver_pb2
 from sklearn.utils.validation import check_array, check_is_fitted
@@ -24,6 +23,39 @@ class Path:
         self.cost = 0
         self.id = -1
         self.target = -1
+
+    def is_same_as(self, path):
+        if self.leaf_id != path.leaf_id:
+            return False
+
+        if self.target != path.target:
+            return False
+
+        if self.cost != path.cost:
+            return False
+
+        if len(self.node_ids) != len(path.node_ids):
+            return False
+
+        for i in range(len(self.node_ids)):
+            node_id = self.node_ids[i]
+            split_id = self.splits[i]
+            found = False
+            for j in range(len(path.node_ids)):
+                if path.node_ids[j] == node_id and path.splits[j] == split_id:
+                    found = True
+                    break
+            if not found:
+                return False
+
+        return True
+
+    def print_path(self):
+        print("Nodes: ", self.node_ids)
+        print("Splits: ", self.splits)
+        print("Leaf: ", self.leaf_id)
+        print("Target: ", self.target)
+        print("Cost: ", self.cost)
 
     def set_leaf(self, leaf_id, depth):
         """TODO: Documentation.
@@ -85,6 +117,7 @@ class Split:
 def row_satisfies_path(X, leaf, splits, row, path):
     """TODO: Documentation.
     """
+    # path.print_path()
     split_ids = path.splits
     node_ids = path.node_ids
     for i in range(len(node_ids)):
@@ -203,6 +236,8 @@ class DTreeMasterProblem(BaseMasterProblem):
     def add_column(self, path):
         """TODO: Documentation.
         """
+        print("Adding path")
+        path.print_path()
         objective = self.solver_.Objective()
         infinity = self.solver_.infinity()
         xp_var = self.solver_.IntVar(
@@ -258,8 +293,8 @@ class DTreeMasterProblem(BaseMasterProblem):
             print('RMP Optimal objective value = %f' %
                   self.solver_.Objective().Value())
 
-            for var in self.solver_.variables():
-                print(var.name(), var.solution_value())
+            # for var in self.solver_.variables():
+            #     print(var.name(), var.solution_value())
 
             leaf_duals = []
             for lid in range(len(self.leaves_)):
@@ -506,7 +541,7 @@ class DTreeSubProblem(BaseSubproblem):
         # Solve sub problem
         result_status = self.solver_.Solve(get_params_from_string(params))
 
-        # Empty column is always feasible.
+        # The current path is always feasible.
         has_solution = (result_status == pywraplp.Solver.OPTIMAL or
                         result_status == pywraplp.Solver.FEASIBLE)
         assert has_solution
@@ -543,8 +578,8 @@ class DTreeSubProblem(BaseSubproblem):
         for i in range(n_rows):
             z_var = self.solver_.variable(self.z_vars_[i])
             path.cost += z_var.solution_value()
-            if z_var.solution_value() > 0.5:
-                print(self.z_vars_[i], z_var)
+            # if z_var.solution_value() > 0.5:
+            #     print(self.z_vars_[i], z_var)
         return [path]
 
     def row_satisfies_split(self, row, split):
@@ -555,6 +590,111 @@ class DTreeSubProblem(BaseSubproblem):
         if self.X_[row, feature] <= threshold:
             return True
         return False
+
+
+class DTreeSubProblemHeuristic(BaseSubproblem):
+    """TODO: Documentation."""
+
+    def __init__(self, leaves, nodes, splits, targets,
+                 depth) -> None:
+        super().__init__()
+        self.leaves_ = leaves
+        self.nodes_ = nodes
+        self.splits_ = splits
+        self.targets_ = targets
+        self.tree_depth_ = depth
+
+    def generate_columns(self, X, y, dual_costs, params=""):
+        """ TODO: Documentation."""
+        # Generate random 100 columns and return the ones with postive reduced
+        # cost.
+        generated_paths = []
+        for iter in range(100):
+            path = Path()
+            # Pick a leaf
+            leaf = random.choice(self.leaves_)
+            path.leaf_id = leaf.id
+
+            # Pick splits for each node.
+            node_ids = leaf.left_nodes + leaf.right_nodes
+            path.node_ids = node_ids
+            path.splits = []
+            success = True
+            for node_id in node_ids:
+                node = self.nodes_[node_id]
+                candidate_splits = node.candidate_splits
+                for used_split in path.splits:
+                    if used_split in candidate_splits:
+                        candidate_splits.remove(used_split)
+                if not candidate_splits:
+                    success = False
+                    break
+                chosen_split = random.choice(candidate_splits)
+                path.splits.append(chosen_split)
+
+            if not success:
+                continue
+
+            # Compute the best target.
+            n_rows = X.shape[0]
+
+            possible_targets = {}
+            best_target = -1
+            best_target_count = 0
+            for row in range(n_rows):
+                if row_satisfies_path(X, leaf, self.splits_, row, path):
+                    target = y[row]
+                    if target in possible_targets.keys():
+                        possible_targets[target] += 1
+                    else:
+                        possible_targets[target] = 1
+
+                    if possible_targets[target] > best_target_count:
+                        best_target_count = possible_targets[target]
+                        best_target = target
+            path.target = best_target
+            path.cost = best_target_count
+
+            already_generated = False
+            for old_path in generated_paths:
+                if path.is_same_as(old_path):
+                    already_generated = True
+                    break
+
+            if already_generated:
+                continue
+
+            # Evaluate the reduced cost.
+            reduced_cost = self.get_reduced_cost(X, y, dual_costs, path)
+            if reduced_cost > 1e-6:
+                print("Generated new path: ", len(generated_paths))
+                path.print_path()
+                generated_paths.append(path)
+
+        return generated_paths
+
+    def get_reduced_cost(self, X, y, dual_costs, path):
+        """TODO: Documentation."""
+        n_rows = X.shape[0]
+        leaves_dual = dual_costs[0]
+        row_duals = dual_costs[1]
+        ns_duals = dual_costs[2]
+
+        reduced_cost = -leaves_dual[path.leaf_id]
+
+        for row in range(n_rows):
+            if row_satisfies_path(X, self.leaves_[path.leaf_id],
+                                  self.splits_, row, path):
+                reduced_cost -= row_duals[row]
+                if y[row] == path.target:
+                    reduced_cost += 1
+
+        for i in range(len(path.node_ids)):
+            node_id = path.node_ids[i]
+            split_id = path.splits[i]
+            reduced_cost -= ns_duals[path.leaf_id][node_id][split_id]
+
+        return reduced_cost
 
 
 class DTreeClassifier(ColGenClassifier):
@@ -607,6 +747,10 @@ class DTreeClassifier(ColGenClassifier):
             self.initial_paths, leaves, nodes, splits)
         self.subproblems = []
         all_subproblem_params = []
+        heuristic = DTreeSubProblemHeuristic(
+            leaves, nodes, splits, targets, self.tree_depth)
+        self.subproblems.append(heuristic)
+        all_subproblem_params.append("")
         for leaf in leaves:
             subproblem = DTreeSubProblem(
                 leaf, nodes, splits, targets, self.tree_depth, 'cbc')
@@ -626,6 +770,8 @@ class DTreeClassifier(ColGenClassifier):
     def predict(self, X):
         """TODO: Documentation.
         """
+        X = check_array(X, accept_sparse=True)
+        check_is_fitted(self, 'is_fitted_')
         selected_paths = self.master_problem.selected_paths
         # Check for each row, which path it satisfies. There should be exactly
         # one.
