@@ -1,3 +1,4 @@
+"""TODO: Documentation."""
 
 from random import random
 from random import choice
