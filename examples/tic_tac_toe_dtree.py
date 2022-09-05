@@ -34,30 +34,45 @@ def main():
 
     print(df.head())
 
-    # Convert animal labels to numbers
+    # Convert labels to numbers
     le = preprocessing.LabelEncoder()
     for col in df.columns:
         df[col] = le.fit_transform(df[col])
 
-    features = (list(df.columns[:-1]))
+    ohe = preprocessing.OneHotEncoder(handle_unknown='ignore')
+    # for col in df.columns:
+    #     df[col] = ohe.fit_transform(df[col])
 
-    X = df[features]
+    # print(df.head())
+
+    features = (list(df.columns[:-1]))
+    X = ohe.fit_transform(df[features])
+    print(X.shape)
+
+    # X = df[features]
     y = df['Class']
 
     # split dataset to 60% training and 40% testing
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.4, random_state=0)
     print(X_train.shape, y_train.shape)
+    print(X.shape, y.shape)
+    print(X)
+
+    experiment_max_depth = 2
 
     t0 = time()
     print("DecisionTree")
 
     dt = tree.DecisionTreeClassifier(
-        min_samples_split=20, max_depth=3, random_state=99)
+        max_depth=experiment_max_depth, random_state=99)
 
-    clf_dt = dt.fit(X_train, y_train)
+    # clf_dt = dt.fit(X_train, y_train)
+    clf_dt = dt.fit(X, y)
 
-    print("Acurracy: ", clf_dt.score(X_test, y_test))
+    print("Train Acurracy: ", clf_dt.score(X_train, y_train))
+    print("Test Acurracy: ", clf_dt.score(X_test, y_test))
+    print("Full Acurracy: ", clf_dt.score(X, y))
     t1 = time()
     print("time elapsed: ", t1-t0)
 
@@ -113,7 +128,7 @@ def main():
         # Randomly choose two more splits
         for iter in range(2):
             chosen = choice(split_ids)
-            while(chosen == corresponding_split.id):
+            while(chosen in node.candidate_splits):
                 chosen = choice(split_ids)
             node.candidate_splits.append(chosen)
 
@@ -199,14 +214,16 @@ def main():
         splits[split.id] = split
 
     clf = DTreeClassifier(paths, leaves, nodes, splits,
-                          tree_depth=3, targets=[0, 1], max_iterations=70)
-    clf.fit(X_train, y_train)
+                          tree_depth=experiment_max_depth,
+                          targets=[0, 1], max_iterations=70)
+    clf.fit(X.toarray(), y)
 
-    print(X_train.shape)
     print(clf.mp_optimal_, clf.performed_iter_)
     for i in range(len(all_leaves)):
         print(i, clf.num_col_added_sp_[i])
-    print("Acurracy: ", clf.score(X_test, y_test))
+    print("Train Acurracy: ", clf_dt.score(X_train, y_train))
+    print("Test Acurracy: ", clf_dt.score(X_test, y_test))
+    print("Full Acurracy: ", clf_dt.score(X, y))
 
 
 if __name__ == "__main__":

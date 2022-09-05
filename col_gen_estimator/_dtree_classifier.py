@@ -389,7 +389,10 @@ class DTreeSubProblem(BaseSubproblem):
         infinity = self.solver_.infinity()
 
         n_rows = self.X_.shape[0]
+        # Binary variables indicating that row reaches the leaf and has the
+        # correct target.
         self.z_vars_ = [None]*n_rows
+        # Binary variables indicating that row reaches the leaf.
         self.y_vars_ = [None]*n_rows
         objective = self.solver_.Objective()
         for i in range(n_rows):
@@ -402,6 +405,8 @@ class DTreeSubProblem(BaseSubproblem):
             objective.SetCoefficient(y_var, -row_dual)
             self.y_vars_[i] = y_var.index()
 
+        # Binary variables u_j_a indicating that split s is assigned to the
+        # node j.
         self.u_vars_ = {}
         self.leaf_
         nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
@@ -435,9 +440,8 @@ class DTreeSubProblem(BaseSubproblem):
         for split in all_splits:
             unique_split = self.solver_.Constraint(
                 0, 1, "unique_split_" + str(split))
-            for node in self.nodes_:
-                if node.id not in nodes:
-                    continue
+            for node_id in nodes:
+                node = self.nodes_[node_id]
                 if split not in node.candidate_splits:
                     continue
                 u_var = self.solver_.variable(self.u_vars_[node.id][split])
@@ -541,10 +545,16 @@ class DTreeSubProblem(BaseSubproblem):
         # Solve sub problem
         result_status = self.solver_.Solve(get_params_from_string(params))
 
-        # The current path is always feasible.
         has_solution = (result_status == pywraplp.Solver.OPTIMAL or
                         result_status == pywraplp.Solver.FEASIBLE)
-        assert has_solution
+        if not has_solution:
+            if result_status == pywraplp.Solver.INFEASIBLE:
+                print("Warning: subproblem infeasible.")
+            print("Warning: No solution found in subproblem.")
+            return []
+
+        # The current path is always feasible.
+        # assert has_solution
 
         # print(self.solver_.ExportModelAsLpFormat(False))
 
@@ -606,10 +616,10 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
 
     def generate_columns(self, X, y, dual_costs, params=""):
         """ TODO: Documentation."""
-        # Generate random 100 columns and return the ones with postive reduced
+        # Generate random columns and return the ones with postive reduced
         # cost.
         generated_paths = []
-        for iter in range(100):
+        for iter in range(1000):
             path = Path()
             # Pick a leaf
             leaf = random.choice(self.leaves_)
