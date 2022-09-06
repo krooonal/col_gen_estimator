@@ -1,6 +1,6 @@
 """TODO: Documentation."""
 
-from random import random
+import random
 from random import choice
 import pandas as pd
 import numpy as np
@@ -22,6 +22,7 @@ from col_gen_estimator import Path
 
 
 def main():
+    random.seed(10)
     # Load data from URL using pandas read_csv method
     link = 'http://archive.ics.uci.edu/ml/machine-learning-databases/' + \
         'tic-tac-toe/tic-tac-toe.data'
