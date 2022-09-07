@@ -201,6 +201,8 @@ class DTreeMasterProblem(BaseMasterProblem):
                     self.row_cons_[r].SetCoefficient(xp_var, 1)
 
         # consistency constraints
+        # TODO: Correct this. The dummy vars is not dependent on the leaf
+        self.ns_vars = {}
         self.ns_constraints_ = {}
         for leaf in self.leaves_:
             self.ns_constraints_[leaf.id] = {}
@@ -210,15 +212,18 @@ class DTreeMasterProblem(BaseMasterProblem):
                 self.ns_constraints_[leaf.id][node.id] = {}
                 for split in node.candidate_splits:
 
+                    ns_var_ind = self.ns_vars[(node.id, split)] \
+                        if (node.id, split) in self.ns_vars \
+                        else self.solver_.BoolVar("r_ns_" + str(node.id) +
+                                                  "_"+str(split)).index()
+
+                    ns_var = self.solver_.variable(ns_var_ind)
+
                     ns_constraint = self.solver_.Constraint(
                         0, 0, "ns_"+str(node.id)+"_"+str(split)+"_"
                         + str(leaf.id))
 
-                    dummy_var = self.solver_.BoolVar("r_ns_" +
-                                                     str(node.id) +
-                                                     "_"+str(split) +
-                                                     "_"+str(leaf.id))
-                    ns_constraint.SetCoefficient(dummy_var, -1)
+                    ns_constraint.SetCoefficient(ns_var, -1)
 
                     for path in self.paths_:
                         for i in range(len(path.node_ids)):

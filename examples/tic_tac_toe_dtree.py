@@ -41,9 +41,6 @@ def main():
         df[col] = le.fit_transform(df[col])
 
     ohe = preprocessing.OneHotEncoder(handle_unknown='ignore')
-    # for col in df.columns:
-    #     df[col] = ohe.fit_transform(df[col])
-
     # print(df.head())
 
     features = (list(df.columns[:-1]))
@@ -53,17 +50,39 @@ def main():
     # X = df[features]
     y = df['Class']
 
+    experiment_max_depth = 4
+
+    t0 = time()
+    print("DecisionTree")
+
+    combined_splits = {}
+    combined_nodes = {}
+    for i in range(100):
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.4, random_state=i)
+        dt = tree.DecisionTreeClassifier(
+            max_depth=experiment_max_depth, random_state=99)
+        clf_dt = dt.fit(X_train, y_train)
+
+        n_nodes = clf_dt.tree_.node_count
+        children_left = clf_dt.tree_.children_left
+        children_right = clf_dt.tree_.children_right
+        feature = clf_dt.tree_.feature
+        threshold = clf_dt.tree_.threshold
+        targets = clf_dt.tree_.value
+        is_leaves = get_is_leaves(n_nodes, children_left, children_right)
+        all_splits = get_all_splits(
+            n_nodes, feature, threshold, is_leaves)
+        combined_splits = merge_all_splits(combined_splits, all_splits)
+        all_nodes = get_all_nodes(
+            n_nodes, feature, threshold, is_leaves, combined_splits)
+        combined_nodes = merge_all_nodes(combined_nodes, all_nodes)
+
     # split dataset to 60% training and 40% testing
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.4, random_state=0)
     print(X_train.shape, y_train.shape)
     print(X.shape, y.shape)
-    print(X)
-
-    experiment_max_depth = 2
-
-    t0 = time()
-    print("DecisionTree")
 
     dt = tree.DecisionTreeClassifier(
         max_depth=experiment_max_depth, random_state=99)
@@ -77,14 +96,6 @@ def main():
     t1 = time()
     print("time elapsed: ", t1-t0)
 
-    tt0 = time()
-    print("cross result========")
-    scores = cross_val_score(dt, X, y, cv=3)
-    print(scores)
-    print(scores.mean())
-    tt1 = time()
-    print("time elapsed: ", tt1-tt0)
-
     n_nodes = clf_dt.tree_.node_count
     children_left = clf_dt.tree_.children_left
     children_right = clf_dt.tree_.children_right
@@ -93,50 +104,78 @@ def main():
     targets = clf_dt.tree_.value
     n_clases = clf_dt.tree_.n_classes
 
-    is_leaves = np.zeros(shape=n_nodes, dtype=bool)
-    for n_id in range(n_nodes):
-        if children_left[n_id] == children_right[n_id]:
-            is_leaves[n_id] = True
+    is_leaves = get_is_leaves(n_nodes, children_left, children_right)
 
-    paths_to_nodes = [None]*n_nodes
     # Create all used splits
-    all_splits = {}
-    split_ids = []
-    for n_id in range(n_nodes):
-        if is_leaves[n_id]:
-            continue
-        f = feature[n_id]
-        t = threshold[n_id]
-        if (f, t) not in all_splits.keys():
-            split = Split()
-            split.feature = f
-            split.threshold = t
-            split.id = len(all_splits)
-            all_splits[(f, t)] = split
-            split_ids.append(split.id)
-
+    all_splits = get_all_splits(n_nodes, feature, threshold, is_leaves)
+    combined_splits = merge_all_splits(combined_splits, all_splits)
     # Create node and add correspondning split to candidate splits
-    all_nodes = {}
-    for n_id in range(n_nodes):
-        if is_leaves[n_id]:
-            continue
-        node = Node()
-        node.id = len(all_nodes)
-        f = feature[n_id]
-        t = threshold[n_id]
-        corresponding_split = all_splits[(f, t)]
-        node.candidate_splits.append(corresponding_split.id)
-        # Randomly choose two more splits
-        for iter in range(2):
-            chosen = choice(split_ids)
-            while(chosen in node.candidate_splits):
-                chosen = choice(split_ids)
-            node.candidate_splits.append(chosen)
+    all_nodes = get_all_nodes(
+        n_nodes, feature, threshold, is_leaves, combined_splits)
+    combined_nodes = merge_all_nodes(combined_nodes, all_nodes)
 
-        # node.candidate_splits = split_ids
+    all_leaves, all_paths = get_all_leaves_paths(
+        children_left, children_right, feature, threshold,
+        targets, is_leaves, combined_splits, combined_nodes)
 
-        all_nodes[n_id] = node
+    paths = get_paths_list(all_paths)
 
+    leaves = get_leaves_list(all_leaves)
+
+    nodes = get_nodes_list(combined_nodes)
+
+    splits = get_splits_list(combined_splits)
+
+    clf = DTreeClassifier(paths, leaves, nodes, splits,
+                          tree_depth=experiment_max_depth,
+                          targets=[0, 1], max_iterations=70)
+    clf.fit(X.toarray(), y)
+
+    print(clf.mp_optimal_, clf.performed_iter_)
+    for i in range(len(all_leaves)):
+        print(i, clf.num_col_added_sp_[i])
+    print("Train Acurracy: ", clf_dt.score(X_train, y_train))
+    print("Test Acurracy: ", clf_dt.score(X_test, y_test))
+    print("Full Acurracy: ", clf_dt.score(X, y))
+
+
+def get_splits_list(all_splits):
+    splits = [None]*len(all_splits)
+    print("splits")
+    for key, split in all_splits.items():
+        print(split.id, split.feature, split.threshold)
+        splits[split.id] = split
+    return splits
+
+
+def get_nodes_list(all_nodes):
+    nodes = [None]*len(all_nodes)
+    print("Nodes")
+    for key, node in all_nodes.items():
+        print(node.id, node.candidate_splits)
+        nodes[node.id] = node
+    return nodes
+
+
+def get_leaves_list(all_leaves):
+    leaves = [None]*len(all_leaves)
+    print("Leaves")
+    for key, leaf in all_leaves.items():
+        print(leaf.id, leaf.left_nodes, leaf.right_nodes)
+        leaves[leaf.id] = leaf
+    return leaves
+
+
+def get_paths_list(all_paths):
+    paths = []
+    for key, path in all_paths.items():
+        #print(path.node_ids, path.leaf_id, path.target)
+        paths.append(path)
+    return paths
+
+
+def get_all_leaves_paths(children_left, children_right, feature, threshold,
+                         targets, is_leaves, all_splits, all_nodes):
     all_leaves = {}
     all_paths = {}
 
@@ -187,44 +226,82 @@ def main():
             path.cost = targets[node_id][0][path.target]
             print(path.target, targets[node_id])
             all_paths[node_id] = path
-            print("Created path ", path.node_ids, node_id, leaf.id, path.cost)
+            # print("Created path ")
+            # path.print_path()
+    return all_leaves, all_paths
 
-    paths = []
-    leaves = [None]*len(all_leaves)
-    nodes = [None]*len(all_nodes)
-    splits = [None]*len(all_splits)
-    targets = []
 
-    for key, path in all_paths.items():
-        print(path.node_ids, path.leaf_id, path.target)
-        paths.append(path)
+def get_is_leaves(n_nodes, children_left, children_right):
+    is_leaves = np.zeros(shape=n_nodes, dtype=bool)
+    for n_id in range(n_nodes):
+        if children_left[n_id] == children_right[n_id]:
+            is_leaves[n_id] = True
+    return is_leaves
 
-    print("Leaves")
-    for key, leaf in all_leaves.items():
-        print(leaf.id, leaf.left_nodes, leaf.right_nodes)
-        leaves[leaf.id] = leaf
 
-    print("Nodes")
-    for key, node in all_nodes.items():
-        print(node.id, node.candidate_splits)
-        nodes[node.id] = node
+def get_all_splits(n_nodes, feature, threshold, is_leaves):
+    all_splits = {}
+    split_ids = []
+    for n_id in range(n_nodes):
+        if is_leaves[n_id]:
+            continue
+        f = feature[n_id]
+        t = threshold[n_id]
+        if (f, t) not in all_splits.keys():
+            split = Split()
+            split.feature = f
+            split.threshold = t
+            split.id = len(all_splits)
+            all_splits[(f, t)] = split
+            split_ids.append(split.id)
+    return all_splits
 
-    print("splits")
-    for key, split in all_splits.items():
-        print(split.id, split.feature, split.threshold)
-        splits[split.id] = split
 
-    clf = DTreeClassifier(paths, leaves, nodes, splits,
-                          tree_depth=experiment_max_depth,
-                          targets=[0, 1], max_iterations=70)
-    clf.fit(X.toarray(), y)
+def merge_all_splits(splits_dict1, splits_dict2):
+    all_splits = splits_dict1
+    for key, value in splits_dict2.items():
+        if key in all_splits:
+            continue
+        f = key[0]
+        t = key[1]
+        split = Split()
+        split.feature = f
+        split.threshold = t
+        split.id = len(all_splits)
+        all_splits[(f, t)] = split
+    return all_splits
 
-    print(clf.mp_optimal_, clf.performed_iter_)
-    for i in range(len(all_leaves)):
-        print(i, clf.num_col_added_sp_[i])
-    print("Train Acurracy: ", clf_dt.score(X_train, y_train))
-    print("Test Acurracy: ", clf_dt.score(X_test, y_test))
-    print("Full Acurracy: ", clf_dt.score(X, y))
+
+def get_all_nodes(n_nodes, feature, threshold, is_leaves, all_splits):
+    all_nodes = {}
+    for n_id in range(n_nodes):
+        if is_leaves[n_id]:
+            continue
+        node = Node()
+        node.id = len(all_nodes)
+        f = feature[n_id]
+        t = threshold[n_id]
+        corresponding_split = all_splits[(f, t)]
+        node.candidate_splits.append(corresponding_split.id)
+        all_nodes[n_id] = node
+    return all_nodes
+
+
+def merge_all_nodes(nodes_dict1, nodes_dict2):
+    all_nodes = nodes_dict1
+    for key, node2 in nodes_dict2.items():
+        if key in all_nodes:
+            node = all_nodes[key]
+            for split_id in node2.candidate_splits:
+                if split_id not in node.candidate_splits:
+                    node.candidate_splits.append(split_id)
+            all_nodes[key] = node
+        else:
+            node = Node()
+            node.id = len(all_nodes)
+            node.candidate_splits = node2.candidate_splits
+            all_nodes[key] = node
+    return all_nodes
 
 
 if __name__ == "__main__":
