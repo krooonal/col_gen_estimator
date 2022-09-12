@@ -201,6 +201,7 @@ class DTreeMasterProblem(BaseMasterProblem):
                     self.row_cons_[r].SetCoefficient(xp_var, 1)
 
         # consistency constraints
+        self.ns_vars = {}
         self.ns_constraints_ = {}
         for leaf in self.leaves_:
             self.ns_constraints_[leaf.id] = {}
@@ -210,15 +211,18 @@ class DTreeMasterProblem(BaseMasterProblem):
                 self.ns_constraints_[leaf.id][node.id] = {}
                 for split in node.candidate_splits:
 
+                    ns_var_ind = self.ns_vars[(node.id, split)] \
+                        if (node.id, split) in self.ns_vars \
+                        else self.solver_.BoolVar("r_ns_" + str(node.id) +
+                                                  "_"+str(split)).index()
+
+                    ns_var = self.solver_.variable(ns_var_ind)
+
                     ns_constraint = self.solver_.Constraint(
                         0, 0, "ns_"+str(node.id)+"_"+str(split)+"_"
                         + str(leaf.id))
 
-                    dummy_var = self.solver_.BoolVar("r_ns_" +
-                                                     str(node.id) +
-                                                     "_"+str(split) +
-                                                     "_"+str(leaf.id))
-                    ns_constraint.SetCoefficient(dummy_var, -1)
+                    ns_constraint.SetCoefficient(ns_var, -1)
 
                     for path in self.paths_:
                         for i in range(len(path.node_ids)):
@@ -236,8 +240,8 @@ class DTreeMasterProblem(BaseMasterProblem):
     def add_column(self, path):
         """TODO: Documentation.
         """
-        print("Adding path")
-        path.print_path()
+        # print("Adding path")
+        # path.print_path()
         objective = self.solver_.Objective()
         infinity = self.solver_.infinity()
         xp_var = self.solver_.IntVar(
@@ -389,7 +393,10 @@ class DTreeSubProblem(BaseSubproblem):
         infinity = self.solver_.infinity()
 
         n_rows = self.X_.shape[0]
+        # Binary variables indicating that row reaches the leaf and has the
+        # correct target.
         self.z_vars_ = [None]*n_rows
+        # Binary variables indicating that row reaches the leaf.
         self.y_vars_ = [None]*n_rows
         objective = self.solver_.Objective()
         for i in range(n_rows):
@@ -402,6 +409,8 @@ class DTreeSubProblem(BaseSubproblem):
             objective.SetCoefficient(y_var, -row_dual)
             self.y_vars_[i] = y_var.index()
 
+        # Binary variables u_j_a indicating that split s is assigned to the
+        # node j.
         self.u_vars_ = {}
         self.leaf_
         nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
@@ -435,9 +444,8 @@ class DTreeSubProblem(BaseSubproblem):
         for split in all_splits:
             unique_split = self.solver_.Constraint(
                 0, 1, "unique_split_" + str(split))
-            for node in self.nodes_:
-                if node.id not in nodes:
-                    continue
+            for node_id in nodes:
+                node = self.nodes_[node_id]
                 if split not in node.candidate_splits:
                     continue
                 u_var = self.solver_.variable(self.u_vars_[node.id][split])
@@ -449,9 +457,8 @@ class DTreeSubProblem(BaseSubproblem):
                 -infinity, self.tree_depth_-1, "row_" + str(i))
             y_var = self.solver_.variable(self.y_vars_[i])
             y_lb_cons.SetCoefficient(y_var, -1)
-            for node in self.nodes_:
-                if node.id not in nodes:
-                    continue
+            for node_id in nodes:
+                node = self.nodes_[node_id]
                 rn_cons = self.solver_.Constraint(
                     -infinity, 0, "rn_" + str(i) + '_' + str(node.id))
 
@@ -473,6 +480,7 @@ class DTreeSubProblem(BaseSubproblem):
                             y_lb_cons.SetCoefficient(u_var, 1)
 
         # only one class selected
+        # Binary variables indicating that the class is selected.
         self.w_vars_ = [None]*len(self.targets_)
         single_target_cons = self.solver_.Constraint(0, 1, 'single_target')
         for i in range(len(self.targets_)):
@@ -484,9 +492,12 @@ class DTreeSubProblem(BaseSubproblem):
         for i in range(n_rows):
             z_var = self.solver_.variable(self.z_vars_[i])
             y_var = self.solver_.variable(self.y_vars_[i])
+            # z <= y (row reaches leaf)
             yz_cons = self.solver_.Constraint(-infinity, 0, "yz_" + str(i))
             yz_cons.SetCoefficient(z_var, 1)
             yz_cons.SetCoefficient(y_var, -1)
+
+            # z <= w (row has correct target)
             correct_class = self.y_[i]
             w_var = self.solver_.variable(self.w_vars_[correct_class])
             wz_cons = self.solver_.Constraint(-infinity, 0, "wz_" + str(i))
@@ -541,9 +552,10 @@ class DTreeSubProblem(BaseSubproblem):
         # Solve sub problem
         result_status = self.solver_.Solve(get_params_from_string(params))
 
-        # The current path is always feasible.
         has_solution = (result_status == pywraplp.Solver.OPTIMAL or
                         result_status == pywraplp.Solver.FEASIBLE)
+
+        # The current path is always feasible.
         assert has_solution
 
         # print(self.solver_.ExportModelAsLpFormat(False))
@@ -606,10 +618,10 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
 
     def generate_columns(self, X, y, dual_costs, params=""):
         """ TODO: Documentation."""
-        # Generate random 100 columns and return the ones with postive reduced
+        # Generate random columns and return the ones with postive reduced
         # cost.
         generated_paths = []
-        for iter in range(100):
+        for iter in range(1000):
             path = Path()
             # Pick a leaf
             leaf = random.choice(self.leaves_)
@@ -622,7 +634,7 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
             success = True
             for node_id in node_ids:
                 node = self.nodes_[node_id]
-                candidate_splits = node.candidate_splits
+                candidate_splits = node.candidate_splits.copy()
                 for used_split in path.splits:
                     if used_split in candidate_splits:
                         candidate_splits.remove(used_split)
@@ -667,8 +679,8 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
             # Evaluate the reduced cost.
             reduced_cost = self.get_reduced_cost(X, y, dual_costs, path)
             if reduced_cost > 1e-6:
-                print("Generated new path: ", len(generated_paths))
-                path.print_path()
+                # print("Generated new path: ", len(generated_paths))
+                # path.print_path()
                 generated_paths.append(path)
 
         return generated_paths
@@ -720,7 +732,7 @@ class DTreeClassifier(ColGenClassifier):
         # Each node must be in sequence.
         node_ids = []
         node_id = 0
-        for node in nodes:
+        for node in self.nodes:
             assert node.id == node_id
             node_ids.append(node.id)
             node_id += 1
@@ -744,16 +756,18 @@ class DTreeClassifier(ColGenClassifier):
             assert len(path.splits) == self.tree_depth
 
         self.master_problem = DTreeMasterProblem(
-            self.initial_paths, leaves, nodes, splits)
+            self.initial_paths, self.leaves, self.nodes, self.splits)
         self.subproblems = []
         all_subproblem_params = []
         heuristic = DTreeSubProblemHeuristic(
-            leaves, nodes, splits, targets, self.tree_depth)
+            self.leaves, self.nodes, self.splits, self.targets,
+            self.tree_depth)
         self.subproblems.append(heuristic)
         all_subproblem_params.append("")
-        for leaf in leaves:
+        for leaf in self.leaves:
             subproblem = DTreeSubProblem(
-                leaf, nodes, splits, targets, self.tree_depth, 'cbc')
+                leaf, self.nodes, self.splits, self.targets,
+                self.tree_depth, 'cbc')
             self.subproblems.append(subproblem)
             all_subproblem_params.append(subproblem_params)
         super().__init__(max_iterations, self.master_problem, self.subproblems,
