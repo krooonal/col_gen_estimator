@@ -182,7 +182,7 @@ def get_leaves_list(all_leaves):
 def get_paths_list(all_paths):
     paths = []
     for key, path in all_paths.items():
-        #print(path.node_ids, path.leaf_id, path.target)
+        # print(path.node_ids, path.leaf_id, path.target)
         paths.append(path)
     return paths
 
