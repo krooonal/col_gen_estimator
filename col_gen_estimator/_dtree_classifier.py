@@ -201,7 +201,6 @@ class DTreeMasterProblem(BaseMasterProblem):
                     self.row_cons_[r].SetCoefficient(xp_var, 1)
 
         # consistency constraints
-        # TODO: Correct this. The dummy vars is not dependent on the leaf
         self.ns_vars = {}
         self.ns_constraints_ = {}
         for leaf in self.leaves_:
