@@ -499,11 +499,11 @@ def test_fit_predict(data):
 
     assert_equal(clf.mp_optimal_, True)
     assert_equal(clf.performed_iter_, 2)
-    assert_equal(clf.num_col_added_sp_[0], 1)
-    assert_equal(clf.num_col_added_sp_[1], 0)
-    assert_equal(clf.num_col_added_sp_[2], 0)
-    assert_equal(clf.num_col_added_sp_[3], 0)
-    assert_equal(clf.num_col_added_sp_[4], 0)
+    assert_equal(clf.num_col_added_sp_[0][0], 1)
+    assert_equal(clf.num_col_added_sp_[1][0], 0)
+    assert_equal(clf.num_col_added_sp_[1][1], 0)
+    assert_equal(clf.num_col_added_sp_[1][2], 0)
+    assert_equal(clf.num_col_added_sp_[1][3], 0)
 
     y_pred = clf.predict(X)
     assert y_pred.shape == (X.shape[0],)

@@ -762,14 +762,16 @@ class DTreeClassifier(ColGenClassifier):
         heuristic = DTreeSubProblemHeuristic(
             self.leaves, self.nodes, self.splits, self.targets,
             self.tree_depth)
-        self.subproblems.append(heuristic)
-        all_subproblem_params.append("")
+        self.subproblems.append([heuristic])
+        all_subproblem_params.append([""])
+        self.subproblems.append([])
+        all_subproblem_params.append([])
         for leaf in self.leaves:
             subproblem = DTreeSubProblem(
                 leaf, self.nodes, self.splits, self.targets,
                 self.tree_depth, 'cbc')
-            self.subproblems.append(subproblem)
-            all_subproblem_params.append(subproblem_params)
+            self.subproblems[1].append(subproblem)
+            all_subproblem_params[1].append(subproblem_params)
         super().__init__(max_iterations, self.master_problem, self.subproblems,
                          rmp_is_ip, rmp_solver_params, master_ip_solver_params,
                          all_subproblem_params)
