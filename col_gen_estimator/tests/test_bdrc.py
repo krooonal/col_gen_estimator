@@ -39,7 +39,7 @@ def test_default_params():
     assert clf.p == 1
     assert clf.rmp_solver_params == ""
     assert clf.master_ip_solver_params == ""
-    assert clf.subproblem_params == [""]
+    assert clf.subproblem_params == [[""]]
     assert clf.rmp_is_ip
 
 
@@ -57,7 +57,7 @@ def test_fit_predict(data):
 
     assert_equal(clf.mp_optimal_, True)
     assert_equal(clf.performed_iter_, 2)
-    assert_equal(clf.num_col_added_sp_[0], 1)
+    assert_equal(clf.num_col_added_sp_[0][0], 1)
 
     X = data[0]
     y_pred = clf.predict(X)
@@ -86,8 +86,8 @@ def test_heuristics(data):
 
     assert_equal(clf.mp_optimal_, True)
     assert_equal(clf.performed_iter_, 3)
-    assert_equal(clf.num_col_added_sp_[0], 2)
-    assert_equal(clf.num_col_added_sp_[1], 1)
+    assert_equal(clf.num_col_added_sp_[0][0], 2)
+    assert_equal(clf.num_col_added_sp_[1][0], 1)
 
     X = data[0]
     y_pred = clf.predict(X)

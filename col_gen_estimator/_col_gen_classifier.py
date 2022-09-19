@@ -80,15 +80,21 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         Maximum column generation iterations. Negative values removes the
         iteration limit and the problem is solved till optimality.
     master_problem : Instance of BaseMasterProblem, default = BaseSubproblem()
-    subproblem : Instance of BaseSubproblem, default = BaseSubproblem()
+    subproblems : List of list of instances of BaseSubproblem according to 
+        their levels. The subproblems are called in increasing values of their
+        levels. The list of subproblems at level i+1 is given by 
+        subproblems[i+1]. The subproblems[i+1] are called only if the 
+        subproblems[i] fail to generate any columns. Typically, the subproblem
+        heuristics are passed at lower levels and the exact methods are passed
+        at the higher levels. Default = [[BaseSubproblem()]]
     rmp_is_ip : boolean, default = False
         True if the master problem has integer variables.
     rmp_solver_params: string, default = "",
         Solver parameters for solving restricted master problem (rmp).
     master_ip_solver_params: string, default = "",
         Solver parameters for solving the integer master problem.
-    subproblem_params: list of string, default = [""],
-        Parameters for solving the subproblem.
+    subproblem_params: list of list of string, default = [""],
+        Parameters for solving the subproblems (as per their levels).
 
     Attributes
     ----------
@@ -110,11 +116,11 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
 
     def __init__(self, max_iterations=-1,
                  master_problem=BaseMasterProblem(),
-                 subproblems=[BaseSubproblem()],
+                 subproblems=[[BaseSubproblem()]],
                  rmp_is_ip=False,
                  rmp_solver_params="",
                  master_ip_solver_params="",
-                 subproblem_params=[""]):
+                 subproblem_params=[[""]]):
         self.max_iterations = max_iterations
         self.master_problem = master_problem
         self.subproblems = subproblems
@@ -123,6 +129,8 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         self.master_ip_solver_params = master_ip_solver_params
         self.subproblem_params = subproblem_params
         assert len(subproblems) == len(subproblem_params)
+        for level in range(len(subproblems)):
+            assert len(subproblems[level]) == len(subproblem_params[level])
 
     def fit(self, X, y):
         """Runs the column generation loop.
@@ -161,7 +169,9 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
 
         self.performed_iter_ = 0
         self.mp_optimal_ = False
-        self.num_col_added_sp_ = [0]*len(self.subproblems)
+        self.num_col_added_sp_ = []
+        for level in range(len(self.subproblems)):
+            self.num_col_added_sp_.append([0]*len(self.subproblems[level]))
 
         for iter in range(self.max_iterations):
             print("Iteration number: ", iter+1)
@@ -170,16 +180,22 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
 
             rmp_updated = False
             sp_ind = 0
-            for sp_ind in range(len(self.subproblems)):
-                generated_columns = self.subproblems[sp_ind].generate_columns(
-                    X, self.processed_y_, dual_costs,
-                    self.subproblem_params[sp_ind])
+            for sp_level in range(len(self.subproblems)):
+                # TODO: do this in parallel.
+                for sp_ind in range(len(self.subproblems[sp_level])):
+                    generated_columns = self.subproblems[sp_level][sp_ind] \
+                        .generate_columns(
+                        X, self.processed_y_, dual_costs,
+                        self.subproblem_params[sp_level][sp_ind])
 
-                rmp_updated = False
-                for column in generated_columns:
-                    col_added = self.master_problem.add_column(column)
-                    self.num_col_added_sp_[sp_ind] += 1 if col_added else 0
-                    rmp_updated = rmp_updated or col_added
+                    rmp_updated = False
+                    for column in generated_columns:
+                        col_added = self.master_problem.add_column(column)
+                        self.num_col_added_sp_[
+                            sp_level][sp_ind] += 1 if col_added else 0
+                        rmp_updated = rmp_updated or col_added
+                    if rmp_updated:
+                        break
                 if rmp_updated:
                     break
 
