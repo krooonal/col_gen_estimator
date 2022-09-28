@@ -215,6 +215,7 @@ class DTreeMasterProblem(BaseMasterProblem):
                         if (node.id, split) in self.ns_vars \
                         else self.solver_.BoolVar("r_ns_" + str(node.id) +
                                                   "_"+str(split)).index()
+                    self.ns_vars[(node.id, split)] = ns_var_ind
 
                     ns_var = self.solver_.variable(ns_var_ind)
 
@@ -854,6 +855,7 @@ class DTreeMasterProblemNew(DTreeMasterProblem):
                         if (node.id, split) in self.ns_vars \
                         else self.solver_.BoolVar("r_ns_" + str(node.id) +
                                                   "_"+str(split)).index()
+                    self.ns_vars[(node.id, split)] = ns_var_ind
 
                     ns_var = self.solver_.variable(ns_var_ind)
 
