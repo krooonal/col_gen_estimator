@@ -10,6 +10,9 @@ from ._dtree_classifier import Path, Node, Split, Leaf
 from ._dtree_classifier import DTreeMasterProblem, DTreeSubProblem
 from ._dtree_classifier import DTreeClassifier
 from ._dtree_classifier import DTreeSubProblemHeuristic
+from ._dtree_classifier import DTreeMasterProblemNew, DTreeSubProblemNew
+from ._dtree_classifier import DTreeClassifierNew
+from ._dtree_classifier import DTreeSubProblemHeuristicNew
 
 from ._version import __version__
 
@@ -20,4 +23,7 @@ __all__ = ['BaseMasterProblem', 'BaseSubproblem', 'ColGenClassifier',
            'Path', 'Node', 'Split', 'Leaf',
            'DTreeMasterProblem', 'DTreeSubProblem', 'DTreeSubProblemHeuristic',
            'DTreeClassifier',
+           'DTreeMasterProblemNew', 'DTreeSubProblemNew',
+           'DTreeSubProblemHeuristicNew',
+           'DTreeClassifierNew',
            '__version__']
