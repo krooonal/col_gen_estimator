@@ -145,8 +145,6 @@ def main():
     clf.fit(X_train.toarray(), y_train.to_numpy())
 
     print(clf.mp_optimal_, clf.performed_iter_)
-    for i in range(len(all_leaves)):
-        print(i, clf.num_col_added_sp_[i])
     print("Train Acurracy: ", clf.score(X_train, y_train))
     print("Test Acurracy: ", clf.score(X_test, y_test))
     print("Full Acurracy: ", clf.score(X, y))

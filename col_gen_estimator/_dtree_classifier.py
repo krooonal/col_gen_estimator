@@ -4,6 +4,7 @@ TODO: Documentation of the file.
 import numpy as np
 import math
 import random
+import multiprocessing as mp
 from ortools.linear_solver import pywraplp
 from ortools.linear_solver import linear_solver_pb2
 from sklearn.utils.validation import check_array, check_is_fitted
@@ -133,6 +134,25 @@ def row_satisfies_path(X, leaf, splits, row, path):
     return True
 
 
+def row_satisfies_path_new(X_row, leaf, splits, path):
+    """TODO: Documentation.
+    """
+    # path.print_path()
+    split_ids = path.splits
+    node_ids = path.node_ids
+    for i in range(len(node_ids)):
+        split = splits[split_ids[i]]
+        feature = split.feature
+        threshold = split.threshold
+        if node_ids[i] in leaf.left_nodes:
+            if X_row[feature] > threshold:
+                return False
+        else:  # Right node in the path
+            if X_row[feature] <= threshold:
+                return False
+    return True
+
+
 def get_params_from_string(params):
     """ Given the params in string form, returns the MPSolverParameters.
     Parameters
@@ -192,7 +212,9 @@ class DTreeMasterProblem(BaseMasterProblem):
         # row constraints
         n_rows = self.X_.shape[0]
         self.row_cons_ = [None]*n_rows
+        self.added_row = [False]*n_rows
         for r in range(n_rows):
+            self.added_row[r] = True
             self.row_cons_[r] = self.solver_.Constraint(1, 1, "row_"+str(r))
             for path in self.paths_:
                 if row_satisfies_path(X, self.leaves_[path.leaf_id],
@@ -215,6 +237,7 @@ class DTreeMasterProblem(BaseMasterProblem):
                         if (node.id, split) in self.ns_vars \
                         else self.solver_.BoolVar("r_ns_" + str(node.id) +
                                                   "_"+str(split)).index()
+                    self.ns_vars[(node.id, split)] = ns_var_ind
 
                     ns_var = self.solver_.variable(ns_var_ind)
 
@@ -259,6 +282,8 @@ class DTreeMasterProblem(BaseMasterProblem):
         # row constraints
         n_rows = self.X_.shape[0]
         for r in range(n_rows):
+            if not self.added_row[r]:
+                continue
             if row_satisfies_path(self.X_, self.leaves_[path.leaf_id],
                                   self.splits_, r, path):
                 self.row_cons_[r].SetCoefficient(xp_var, 1)
@@ -293,6 +318,9 @@ class DTreeMasterProblem(BaseMasterProblem):
         print('Number of variables RMIP = %d' % self.solver_.NumVariables())
         print('Number of constraints RMIP = %d' %
               self.solver_.NumConstraints())
+        leaf_duals = []
+        row_duals = []
+        ns_duals = {}
         if result_status == pywraplp.Solver.OPTIMAL:
             print('RMP Optimal objective value = %f' %
                   self.solver_.Objective().Value())
@@ -300,16 +328,16 @@ class DTreeMasterProblem(BaseMasterProblem):
             # for var in self.solver_.variables():
             #     print(var.name(), var.solution_value())
 
-            leaf_duals = []
             for lid in range(len(self.leaves_)):
                 leaf_duals.append(self.leaf_cons_[lid].dual_value())
 
-            row_duals = []
             n_rows = self.X_.shape[0]
             for r in range(n_rows):
-                row_duals.append(self.row_cons_[r].dual_value())
+                if self.added_row[r]:
+                    row_duals.append(self.row_cons_[r].dual_value())
+                else:
+                    row_duals.append(0)
 
-            ns_duals = {}
             for leaf in self.leaves_:
                 ns_duals[leaf.id] = {}
                 nodes = leaf.left_nodes + leaf.right_nodes
@@ -321,8 +349,8 @@ class DTreeMasterProblem(BaseMasterProblem):
                             self.ns_constraints_[
                             leaf.id][node.id][split].dual_value()
         else:
-            print(result_status)
-            print(self.solver_.ExportModelAsLpFormat(False))
+            print("Master problem not solved correctly:", result_status)
+            # print(self.solver_.ExportModelAsLpFormat(False))
 
         return (leaf_duals, row_duals, ns_duals)
 
@@ -556,9 +584,11 @@ class DTreeSubProblem(BaseSubproblem):
                         result_status == pywraplp.Solver.FEASIBLE)
 
         # The current path is always feasible.
-        assert has_solution
-
-        # print(self.solver_.ExportModelAsLpFormat(False))
+        # # TODO: Fix this
+        if not has_solution:
+            return []
+            # print(self.solver_.ExportModelAsLpFormat(False))
+        assert has_solution, "Result status: " + str(result_status)
 
         # TODO: This threshold should be a parameter.
         print("Subproblem objective = ", self.solver_.Objective().Value())
@@ -621,7 +651,7 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
         # Generate random columns and return the ones with postive reduced
         # cost.
         generated_paths = []
-        for iter in range(1000):
+        for iter in range(100):
             path = Path()
             # Pick a leaf
             leaf = random.choice(self.leaves_)
@@ -653,8 +683,10 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
             possible_targets = {}
             best_target = -1
             best_target_count = 0
+            row_satisfies_path_array = [False]*n_rows
             for row in range(n_rows):
                 if row_satisfies_path(X, leaf, self.splits_, row, path):
+                    row_satisfies_path_array[row] = True
                     target = y[row]
                     if target in possible_targets.keys():
                         possible_targets[target] += 1
@@ -677,7 +709,8 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
                 continue
 
             # Evaluate the reduced cost.
-            reduced_cost = self.get_reduced_cost(X, y, dual_costs, path)
+            reduced_cost = self.get_reduced_cost(
+                X, y, dual_costs, path, row_satisfies_path_array)
             if reduced_cost > 1e-6:
                 # print("Generated new path: ", len(generated_paths))
                 # path.print_path()
@@ -685,7 +718,127 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
 
         return generated_paths
 
-    def get_reduced_cost(self, X, y, dual_costs, path):
+    def get_reduced_cost(self, X, y, dual_costs, path,
+                         row_satisfies_path_array):
+        """TODO: Documentation."""
+
+        n_rows = X.shape[0]
+        leaves_dual = dual_costs[0]
+        row_duals = dual_costs[1]
+        ns_duals = dual_costs[2]
+
+        reduced_cost = 0
+        try:
+            reduced_cost -= leaves_dual[path.leaf_id]
+        except IndexError:
+            print("List index out of error: ", path.leaf_id, len(leaves_dual))
+
+        reduced_cost += path.cost
+
+        for row in range(n_rows):
+            if row_satisfies_path_array[row]:
+                reduced_cost -= row_duals[row]
+
+        for i in range(len(path.node_ids)):
+            node_id = path.node_ids[i]
+            split_id = path.splits[i]
+            reduced_cost -= ns_duals[path.leaf_id][node_id][split_id]
+
+        return reduced_cost
+
+
+class DTreeSubProblemHeuristicParallel(BaseSubproblem):
+    """TODO: Documentation."""
+
+    def __init__(self, leaves, nodes, splits, targets,
+                 depth, n_threads) -> None:
+        super().__init__()
+        self.leaves_ = leaves
+        self.nodes_ = nodes
+        self.splits_ = splits
+        self.targets_ = targets
+        self.tree_depth_ = depth
+        self.num_threads = n_threads
+
+    def generate_columns(self, X, y, dual_costs, params=""):
+        """ TODO: Documentation."""
+        # Generate random columns and return the ones with postive reduced
+        # cost.
+        generated_paths = []
+        for iter in range(100):
+            path = Path()
+            # Pick a leaf
+            leaf = random.choice(self.leaves_)
+            path.leaf_id = leaf.id
+
+            # Pick splits for each node.
+            node_ids = leaf.left_nodes + leaf.right_nodes
+            path.node_ids = node_ids
+            path.splits = []
+            success = True
+            for node_id in node_ids:
+                node = self.nodes_[node_id]
+                candidate_splits = node.candidate_splits.copy()
+                for used_split in path.splits:
+                    if used_split in candidate_splits:
+                        candidate_splits.remove(used_split)
+                if not candidate_splits:
+                    success = False
+                    break
+                chosen_split = random.choice(candidate_splits)
+                path.splits.append(chosen_split)
+
+            if not success:
+                continue
+
+            # Compute the best target.
+            n_rows = X.shape[0]
+
+            possible_targets = {}
+            best_target = -1
+            best_target_count = 0
+            row_satisfies_path_array = [False]*n_rows
+
+            pool = mp.Pool(self.num_threads)
+            row_satisfies_path_array = pool.starmap(row_satisfies_path_new, [
+                (X[row], leaf, self.splits_, path)
+                for row in range(n_rows)])
+            pool.close()
+            good_rows = np.where(row_satisfies_path)[0]
+            for row in good_rows:
+                target = y[row]
+                if target in possible_targets.keys():
+                    possible_targets[target] += 1
+                else:
+                    possible_targets[target] = 1
+
+                if possible_targets[target] > best_target_count:
+                    best_target_count = possible_targets[target]
+                    best_target = target
+            path.target = best_target
+            path.cost = best_target_count
+
+            already_generated = False
+            for old_path in generated_paths:
+                if path.is_same_as(old_path):
+                    already_generated = True
+                    break
+
+            if already_generated:
+                continue
+
+            # Evaluate the reduced cost.
+            reduced_cost = self.get_reduced_cost(
+                X, y, dual_costs, path, row_satisfies_path_array)
+            if reduced_cost > 1e-6:
+                # print("Generated new path: ", len(generated_paths))
+                # path.print_path()
+                generated_paths.append(path)
+
+        return generated_paths
+
+    def get_reduced_cost(self, X, y, dual_costs, path,
+                         row_satisfies_path_array):
         """TODO: Documentation."""
         n_rows = X.shape[0]
         leaves_dual = dual_costs[0]
@@ -694,12 +847,11 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
 
         reduced_cost = -leaves_dual[path.leaf_id]
 
+        reduced_cost += path.cost
+
         for row in range(n_rows):
-            if row_satisfies_path(X, self.leaves_[path.leaf_id],
-                                  self.splits_, row, path):
+            if row_satisfies_path_array[row]:
                 reduced_cost -= row_duals[row]
-                if y[row] == path.target:
-                    reduced_cost += 1
 
         for i in range(len(path.node_ids)):
             node_id = path.node_ids[i]
@@ -715,7 +867,9 @@ class DTreeClassifier(ColGenClassifier):
 
     def __init__(self, initial_paths=[], leaves=[], nodes=[], splits=[],
                  tree_depth=1,
-                 targets=[], max_iterations=-1, rmp_is_ip=True,
+                 targets=[], max_iterations=-1,
+                 time_limit=-1,
+                 rmp_is_ip=True,
                  rmp_solver_params="",
                  master_ip_solver_params="", subproblem_params=""):
 
@@ -769,10 +923,11 @@ class DTreeClassifier(ColGenClassifier):
         for leaf in self.leaves:
             subproblem = DTreeSubProblem(
                 leaf, self.nodes, self.splits, self.targets,
-                self.tree_depth, 'cbc')
+                self.tree_depth, 'sat')
             self.subproblems[1].append(subproblem)
             all_subproblem_params[1].append(subproblem_params)
-        super().__init__(max_iterations, self.master_problem, self.subproblems,
+        super().__init__(max_iterations, time_limit,
+                         self.master_problem, self.subproblems,
                          rmp_is_ip, rmp_solver_params, master_ip_solver_params,
                          all_subproblem_params)
 
@@ -854,6 +1009,7 @@ class DTreeMasterProblemNew(DTreeMasterProblem):
                         if (node.id, split) in self.ns_vars \
                         else self.solver_.BoolVar("r_ns_" + str(node.id) +
                                                   "_"+str(split)).index()
+                    self.ns_vars[(node.id, split)] = ns_var_ind
 
                     ns_var = self.solver_.variable(ns_var_ind)
 
@@ -1166,7 +1322,8 @@ class DTreeSubProblemHeuristicNew(DTreeSubProblemHeuristic):
                  depth) -> None:
         super().__init__(leaves, nodes, splits, targets, depth)
 
-    def get_reduced_cost(self, X, y, dual_costs, path):
+    def get_reduced_cost(self, X, y, dual_costs, path,
+                         row_satisfies_path_array):
         """TODO: Documentation."""
         n_rows = X.shape[0]
         leaves_dual = dual_costs[0]
@@ -1174,11 +1331,7 @@ class DTreeSubProblemHeuristicNew(DTreeSubProblemHeuristic):
 
         reduced_cost = -leaves_dual[path.leaf_id]
 
-        for row in range(n_rows):
-            if row_satisfies_path(X, self.leaves_[path.leaf_id],
-                                  self.splits_, row, path):
-                if y[row] == path.target:
-                    reduced_cost += 1
+        reduced_cost += path.cost
 
         for i in range(len(path.node_ids)):
             node_id = path.node_ids[i]
@@ -1194,7 +1347,9 @@ class DTreeClassifierNew(ColGenClassifier):
 
     def __init__(self, initial_paths=[], leaves=[], nodes=[], splits=[],
                  tree_depth=1,
-                 targets=[], max_iterations=-1, rmp_is_ip=True,
+                 targets=[], max_iterations=-1,
+                 time_limit=-1,
+                 rmp_is_ip=True,
                  rmp_solver_params="",
                  master_ip_solver_params="", subproblem_params=""):
 
@@ -1251,7 +1406,290 @@ class DTreeClassifierNew(ColGenClassifier):
                 self.tree_depth, 'cbc')
             self.subproblems[1].append(subproblem)
             all_subproblem_params[1].append(subproblem_params)
-        super().__init__(max_iterations, self.master_problem, self.subproblems,
+        super().__init__(max_iterations, time_limit,
+                         self.master_problem, self.subproblems,
+                         rmp_is_ip, rmp_solver_params, master_ip_solver_params,
+                         all_subproblem_params)
+
+    def _more_tags(self):
+        """TODO: Documentation.
+        """
+        return {'X_types': ['categorical'],
+                'non_deterministic': True,
+                'binary_only': True}
+
+    def predict(self, X):
+        """TODO: Documentation.
+        """
+        X = check_array(X, accept_sparse=True)
+        check_is_fitted(self, 'is_fitted_')
+        selected_paths = self.master_problem.selected_paths
+        # Check for each row, which path it satisfies. There should be exactly
+        # one.
+        num_rows = X.shape[0]
+        y_predict = np.zeros(X.shape[0], dtype=int)
+        for row in range(num_rows):
+            for path in selected_paths:
+                if row_satisfies_path(X, self.leaves[path.leaf_id],
+                                      self.splits, row, path):
+                    y_predict[row] = path.target
+                    break
+        return self.label_encoder_.inverse_transform(y_predict)
+
+
+class DTreeMasterProblemCuts(DTreeMasterProblem):
+    """TODO: Documentation.
+    """
+
+    def __init__(self, initial_paths, leaves, nodes, splits, num_cuts_round=3):
+        super().__init__(initial_paths, leaves, nodes, splits)
+        self.num_cuts_round = num_cuts_round
+
+    def generate_mp(self, X, y):
+        """TODO: Documentation.
+        """
+        if self.generated_:
+            return
+
+        self.X_ = X
+        self.y__ = y
+        infinity = self.solver_.infinity()
+        self.solver_.SetNumThreads(1)
+
+        objective = self.solver_.Objective()
+        self.path_vars_ = [None]*len(self.paths_)
+        for i in range(len(self.paths_)):
+            xp_var = self.solver_.IntVar(0.0, infinity, 'p_'+str(i))
+            self.path_vars_[i] = xp_var.index()
+            self.paths_[i].id = xp_var.index()
+            objective.SetCoefficient(xp_var, self.paths_[i].cost)
+        objective.SetMaximization()
+
+        # leaf constraints
+        self.leaf_cons_ = [None]*len(self.leaves_)
+        for leaf in self.leaves_:
+            self.leaf_cons_[leaf.id] = self.solver_.Constraint(
+                1, 1, "leaf_"+str(leaf.id))
+            for path in self.paths_:
+                if path.leaf_id == leaf.id:
+                    xp_var = self.solver_.variable(path.id)
+                    self.leaf_cons_[leaf.id].SetCoefficient(xp_var, 1)
+
+        # row constraints
+        n_rows = self.X_.shape[0]
+        self.row_cons_ = [None]*n_rows
+        self.added_row = [False]*n_rows
+
+        # consistency constraints
+        self.ns_vars = {}
+        self.ns_constraints_ = {}
+        for leaf in self.leaves_:
+            self.ns_constraints_[leaf.id] = {}
+            nodes = leaf.left_nodes + leaf.right_nodes
+            for node_id in nodes:
+                node = self.nodes_[node_id]
+                self.ns_constraints_[leaf.id][node.id] = {}
+                for split in node.candidate_splits:
+
+                    ns_var_ind = self.ns_vars[(node.id, split)] \
+                        if (node.id, split) in self.ns_vars \
+                        else self.solver_.BoolVar("r_ns_" + str(node.id) +
+                                                  "_"+str(split)).index()
+                    self.ns_vars[(node.id, split)] = ns_var_ind
+
+                    ns_var = self.solver_.variable(ns_var_ind)
+
+                    ns_constraint = self.solver_.Constraint(
+                        0, 0, "ns_"+str(node.id)+"_"+str(split)+"_"
+                        + str(leaf.id))
+
+                    ns_constraint.SetCoefficient(ns_var, -1)
+
+                    for path in self.paths_:
+                        for i in range(len(path.node_ids)):
+                            if path.leaf_id == leaf.id\
+                                and path.node_ids[i] == node.id \
+                                    and path.splits[i] == split:
+                                xp_var = self.solver_.variable(path.id)
+                                ns_constraint.SetCoefficient(xp_var, 1)
+
+                    self.ns_constraints_[
+                        leaf.id][node.id][split] = ns_constraint
+        # print(self.solver_.ExportModelAsLpFormat(False))
+        self.generated_ = True
+
+    def get_satisfied_path_ids(self, row):
+        """TODO: Documentation."""
+        path_ids = []
+        for path in self.paths_:
+            if row_satisfies_path(self.X_, self.leaves_[path.leaf_id],
+                                  self.splits_, row, path):
+                path_ids.append(path.id)
+        return path_ids
+
+    def violated_row_constraint(self, satisfied_path_ids):
+        """TODO: Documentation."""
+        path_sum = 0.0
+        for path_id in satisfied_path_ids:
+            path_sum += self.solver_.variable(path_id).solution_value()
+        if abs(path_sum - 1) > 1e-6:
+            return True
+        return False
+
+    def add_cuts(self):
+        """TODO: Documentation."""
+        assert self.generated_
+        n_rows = self.X_.shape[0]
+        added_cuts = False
+        num_cuts = 0
+        for r in range(n_rows):
+            if num_cuts >= 10:
+                break
+            if self.added_row[r]:
+                continue
+            satisfied_path_ids = self.get_satisfied_path_ids(r)
+            if (self.violated_row_constraint(satisfied_path_ids)):
+                added_cuts = True
+                num_cuts += 1
+                self.added_row[r] = True
+                self.row_cons_[r] = self.solver_.Constraint(
+                    1, 1, "row_"+str(r))
+                for path_id in satisfied_path_ids:
+                    xp_var = self.solver_.variable(path_id)
+                    self.row_cons_[r].SetCoefficient(xp_var, 1)
+        return added_cuts
+
+    def solve_rmp(self, solver_params=''):
+        """TODO: Documentation.
+        """
+        assert self.generated_
+
+        result_status = self.solver_.Solve(
+            get_params_from_string(solver_params))
+
+        # TODO: Hide this under optional logging flag.
+        print('Number of variables RMIP = %d' % self.solver_.NumVariables())
+        print('Number of constraints RMIP = %d' %
+              self.solver_.NumConstraints())
+        for i in range(self.num_cuts_round):
+            if result_status == pywraplp.Solver.OPTIMAL:
+                if (self.add_cuts()):
+                    result_status = self.solver_.Solve(
+                        get_params_from_string(solver_params))
+                else:
+                    break
+            else:
+                break
+
+        leaf_duals = []
+        row_duals = []
+        ns_duals = {}
+        if result_status == pywraplp.Solver.OPTIMAL:
+            print('RMP Optimal objective value = %f' %
+                  self.solver_.Objective().Value())
+
+            # for var in self.solver_.variables():
+            #     print(var.name(), var.solution_value())
+
+            for lid in range(len(self.leaves_)):
+                leaf_duals.append(self.leaf_cons_[lid].dual_value())
+
+            n_rows = self.X_.shape[0]
+            for r in range(n_rows):
+                if self.added_row[r]:
+                    row_duals.append(self.row_cons_[r].dual_value())
+                else:
+                    row_duals.append(0)
+
+            for leaf in self.leaves_:
+                ns_duals[leaf.id] = {}
+                nodes = leaf.left_nodes + leaf.right_nodes
+                for node_id in nodes:
+                    node = self.nodes_[node_id]
+                    ns_duals[leaf.id][node.id] = {}
+                    for split in node.candidate_splits:
+                        ns_duals[leaf.id][node.id][split] = \
+                            self.ns_constraints_[
+                            leaf.id][node.id][split].dual_value()
+        else:
+            print("Master problem not solved correctly:", result_status)
+            # print(self.solver_.ExportModelAsLpFormat(False))
+
+        return (leaf_duals, row_duals, ns_duals)
+
+
+class DTreeClassifierCuts(ColGenClassifier):
+    """TODO: Documentation.
+    """
+
+    def __init__(self, initial_paths=[], leaves=[], nodes=[], splits=[],
+                 tree_depth=1,
+                 targets=[], max_iterations=-1,
+                 time_limit=-1,
+                 rmp_is_ip=True,
+                 rmp_solver_params="",
+                 master_ip_solver_params="", subproblem_params=""):
+
+        self.initial_paths = initial_paths
+        self.leaves = leaves
+        self.nodes = nodes
+        self.splits = splits
+        self.tree_depth = tree_depth
+        self.targets = targets
+        self.subproblem_params = subproblem_params
+        split_ids = []
+        for split in splits:
+            split_ids.append(split.id)
+        # Each node must be in sequence.
+        node_ids = []
+        node_id = 0
+        for node in self.nodes:
+            assert node.id == node_id
+            node_ids.append(node.id)
+            node_id += 1
+
+        # Each leaf must be in sequence.
+        leaf_ids = []
+        leaf_id = 0
+        for leaf in leaves:
+            assert leaf.id == leaf_id
+            leaf_ids.append(leaf.id)
+            leaf_id += 1
+        # Each path can only contain nodes and leaves provided.
+        for path in self.initial_paths:
+            assert path.leaf_id in leaf_ids
+            for node_id in path.node_ids:
+                assert node_id in node_ids
+            for split_id in path.splits:
+                assert split_id in split_ids
+            assert path.target in targets, "Target invalid " + \
+                str(path.target) + str(targets)
+            assert len(path.node_ids) == self.tree_depth
+            assert len(path.splits) == self.tree_depth
+
+        self.master_problem = DTreeMasterProblemCuts(
+            self.initial_paths, self.leaves, self.nodes, self.splits,
+            num_cuts_round=3)
+        self.subproblems = []
+        all_subproblem_params = []
+        heuristic = DTreeSubProblemHeuristic(
+            self.leaves, self.nodes, self.splits, self.targets,
+            self.tree_depth)
+        # heuristic = DTreeSubProblemHeuristicParallel(
+        #     self.leaves, self.nodes, self.splits, self.targets,
+        #     self.tree_depth, n_threads=4)
+        self.subproblems.append([heuristic])
+        all_subproblem_params.append([""])
+        self.subproblems.append([])
+        all_subproblem_params.append([])
+        for leaf in self.leaves:
+            subproblem = DTreeSubProblem(
+                leaf, self.nodes, self.splits, self.targets,
+                self.tree_depth, 'sat')
+            self.subproblems[1].append(subproblem)
+            all_subproblem_params[1].append(subproblem_params)
+        super().__init__(max_iterations, time_limit,
+                         self.master_problem, self.subproblems,
                          rmp_is_ip, rmp_solver_params, master_ip_solver_params,
                          all_subproblem_params)
 

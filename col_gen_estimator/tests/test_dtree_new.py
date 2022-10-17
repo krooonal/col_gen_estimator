@@ -166,7 +166,7 @@ def test_master_prob(data):
     assert_equal(len(duals), 2)
     leaf_duals = duals[0]
     ns_duals = duals[1]
-    assert_array_equal(leaf_duals, [1, 1, 1, 1])
+    assert_array_equal(leaf_duals, [2, 0, 4, 0])
     print_ns_duals(nodes, leaves, ns_duals)
 
 
@@ -185,7 +185,7 @@ def test_master_prob_add_col(data):
     assert_equal(len(duals), 2)
     leaf_duals = duals[0]
     ns_duals = duals[1]
-    assert_array_equal(leaf_duals, [1, 1, 1, 0])
+    assert_array_equal(leaf_duals, [2, 0, 0, 0])
     print_ns_duals(nodes, leaves, ns_duals)
 
     path_7 = data[2][-1]
@@ -194,8 +194,32 @@ def test_master_prob_add_col(data):
     assert_equal(len(duals), 2)
     leaf_duals = duals[0]
     ns_duals = duals[1]
-    assert_array_equal(leaf_duals, [1, 1, 1, 1])
+    assert_array_equal(leaf_duals, [2, 0, 2, 0])
     print_ns_duals(nodes, leaves, ns_duals)
+
+
+def test_subproblem(data):
+    X = data[0]
+    y = data[1]
+    nodes = data[3]
+    leaves = data[4]
+    splits = data[5]
+    targets = data[6]
+    subproblem = DTreeSubProblemNew(leaves[0], nodes, splits, targets, depth=2)
+
+    leaf_duals = [2, 0, 0, 0]
+    ns_duals = initialize_ns_duals(nodes, leaves)
+    ns_duals[0][1][1] = -1.0
+    ns_duals[1][1][1] = 1.0
+    ns_duals[1][1][2] = 2.0
+    ns_duals[2][0][0] = 1.0
+    ns_duals[2][2][1] = 1.0
+    ns_duals[3][0][0] = 1.0
+    ns_duals[3][2][1] = -1.0
+
+    duals = (leaf_duals, ns_duals)
+    new_paths = subproblem.generate_columns(X, y, duals)
+    assert_array_equal(new_paths, [])
 
 
 def test_subproblem2(data):
@@ -205,28 +229,18 @@ def test_subproblem2(data):
     leaves = data[4]
     splits = data[5]
     targets = data[6]
-    subproblem = DTreeSubProblemNew(leaves[0], nodes, splits, targets, depth=2)
-
-    leaf_duals = [1, 1, 1, 0]
-    ns_duals = initialize_ns_duals(nodes, leaves)
-    ns_duals[0][1][2] = 1.0
-    duals = (leaf_duals, ns_duals)
-    new_paths = subproblem.generate_columns(X, y, duals)
-    assert_array_equal(new_paths, [])
-
-
-def test_subproblem4(data):
-    X = data[0]
-    y = data[1]
-    nodes = data[3]
-    leaves = data[4]
-    splits = data[5]
-    targets = data[6]
     subproblem = DTreeSubProblemNew(leaves[3], nodes, splits, targets, depth=2)
 
-    leaf_duals = [1, 1, 1, 0]
+    leaf_duals = [2, 0, 0, 0]
     ns_duals = initialize_ns_duals(nodes, leaves)
-    ns_duals[3][2][2] = 1.0
+    ns_duals[0][1][1] = -1.0
+    ns_duals[1][1][1] = 1.0
+    ns_duals[1][1][2] = 2.0
+    ns_duals[2][0][0] = 1.0
+    ns_duals[2][2][1] = 1.0
+    ns_duals[3][0][0] = 1.0
+    ns_duals[3][2][1] = -1.0
+
     duals = (leaf_duals, ns_duals)
     new_paths = subproblem.generate_columns(X, y, duals)
     assert_equal(len(new_paths), 1)
@@ -248,12 +262,16 @@ def test_get_reduced_cost(data):
     subproblem_heuristic = DTreeSubProblemHeuristicNew(
         leaves, nodes, splits, targets, depth=2)
 
-    leaf_duals = [1, 1, 1, 0]
+    leaf_duals = [2, 0, 0, 0]
     ns_duals = initialize_ns_duals(nodes, leaves)
-    ns_duals[0][1][2] = 1.0
-    ns_duals[1][1][2] = 1.0
+    ns_duals[0][1][1] = -1.0
+    ns_duals[1][1][1] = 1.0
+    ns_duals[1][1][2] = 2.0
+    ns_duals[2][0][0] = 1.0
     ns_duals[2][2][1] = 1.0
-    ns_duals[3][2][2] = 1.0
+    ns_duals[3][0][0] = 1.0
+    ns_duals[3][2][1] = -1.0
+
     duals = (leaf_duals, ns_duals)
     path = Path()
     path.leaf_id = 3
@@ -261,7 +279,11 @@ def test_get_reduced_cost(data):
     path.splits = [0, 1]
     path.cost = 2
     path.target = 1
-    reduced_cost = subproblem_heuristic.get_reduced_cost(X, y, duals, path)
+    row_satisfies_path_array = [False]*X.shape[0]
+    row_satisfies_path_array[0] = True
+    row_satisfies_path_array[1] = True
+    reduced_cost = subproblem_heuristic.get_reduced_cost(
+        X, y, duals, path, row_satisfies_path_array)
     assert(reduced_cost > 1e-6)
 
 
@@ -275,12 +297,16 @@ def test_subproblem_heuristic1(data):
     subproblem = DTreeSubProblemHeuristicNew(
         leaves, nodes, splits, targets, depth=2)
 
-    leaf_duals = [1, 1, 1, 0]
+    leaf_duals = [2, 0, 0, 0]
     ns_duals = initialize_ns_duals(nodes, leaves)
-    ns_duals[0][1][2] = 1.0
-    ns_duals[1][1][2] = 1.0
+    ns_duals[0][1][1] = -1.0
+    ns_duals[1][1][1] = 1.0
+    ns_duals[1][1][2] = 2.0
+    ns_duals[2][0][0] = 1.0
     ns_duals[2][2][1] = 1.0
-    ns_duals[3][2][2] = 1.0
+    ns_duals[3][0][0] = 1.0
+    ns_duals[3][2][1] = -1.0
+
     duals = (leaf_duals, ns_duals)
     random.seed(10)
     new_paths = subproblem.generate_columns(X, y, duals)
