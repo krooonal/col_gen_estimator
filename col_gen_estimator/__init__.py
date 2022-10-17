@@ -13,6 +13,8 @@ from ._dtree_classifier import DTreeSubProblemHeuristic
 from ._dtree_classifier import DTreeMasterProblemNew, DTreeSubProblemNew
 from ._dtree_classifier import DTreeClassifierNew
 from ._dtree_classifier import DTreeSubProblemHeuristicNew
+from ._dtree_classifier import DTreeMasterProblemCuts
+from ._dtree_classifier import DTreeClassifierCuts
 
 from ._version import __version__
 
@@ -26,4 +28,6 @@ __all__ = ['BaseMasterProblem', 'BaseSubproblem', 'ColGenClassifier',
            'DTreeMasterProblemNew', 'DTreeSubProblemNew',
            'DTreeSubProblemHeuristicNew',
            'DTreeClassifierNew',
+           'DTreeMasterProblemCuts',
+           'DTreeClassifierCuts',
            '__version__']

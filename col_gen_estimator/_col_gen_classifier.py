@@ -3,6 +3,8 @@ Base Column Genaration Classifier. One needs to extend this for implementing
 column generation based classifiers.
 """
 
+from time import time
+
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y
 from sklearn.utils.multiclass import unique_labels
@@ -78,7 +80,9 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
     ----------
     max_iterations : int, default=-1
         Maximum column generation iterations. Negative values removes the
-        iteration limit and the problem is solved till optimality.
+        iteration limit.
+    time_limit : int, default=-1
+        Time limit in seconds. Negative values removes the time limit.
     master_problem : Instance of BaseMasterProblem, default = BaseSubproblem()
     subproblems : List of list of instances of BaseSubproblem according to 
         their levels. The subproblems are called in increasing values of their
@@ -115,6 +119,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
     """
 
     def __init__(self, max_iterations=-1,
+                 time_limit=-1,
                  master_problem=BaseMasterProblem(),
                  subproblems=[[BaseSubproblem()]],
                  rmp_is_ip=False,
@@ -122,6 +127,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
                  master_ip_solver_params="",
                  subproblem_params=[[""]]):
         self.max_iterations = max_iterations
+        self.time_limit = time_limit
         self.master_problem = master_problem
         self.subproblems = subproblems
         self.rmp_is_ip = rmp_is_ip
@@ -147,8 +153,10 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         self : object
             Returns self.
         """
+        t_start = time()
         # Check that X and y have correct shape
         X, y = check_X_y(X, y)
+        has_time_limit = self.time_limit > 0
         # Store the classes seen during fit
         self.classes_ = unique_labels(y)
 
@@ -173,8 +181,12 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         for level in range(len(self.subproblems)):
             self.num_col_added_sp_.append([0]*len(self.subproblems[level]))
 
-        for iter in range(self.max_iterations):
-            print("Iteration number: ", iter+1)
+        iter = 0
+        while True:
+            if iter >= self.max_iterations:
+                break
+            iter += 1
+            print("Iteration number: ", iter)
             self.performed_iter_ += 1
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
 
@@ -183,6 +195,9 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
             for sp_level in range(len(self.subproblems)):
                 # TODO: do this in parallel.
                 for sp_ind in range(len(self.subproblems[sp_level])):
+                    self.time_elapsed_ = time() - t_start
+                    if has_time_limit and self.time_elapsed_ > self.time_limit:
+                        break
                     generated_columns = self.subproblems[sp_level][sp_ind] \
                         .generate_columns(
                         X, self.processed_y_, dual_costs,
@@ -196,6 +211,10 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
                         rmp_updated = rmp_updated or col_added
                     if rmp_updated:
                         break
+                self.time_elapsed_ = time() - t_start
+                if has_time_limit and self.time_elapsed_ > self.time_limit:
+                    print("Time limit reached!")
+                    break
                 if rmp_updated:
                     break
 
@@ -209,6 +228,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
             assert solved, "RMP integer program couldn't be solved."
 
         self.is_fitted_ = True
+        self.time_elapsed_ = time() - t_start
         # Return the classifier
         return self
 
