@@ -177,6 +177,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
 
         self.performed_iter_ = 0
         self.mp_optimal_ = False
+        self.time_limit_reached_ = False
         self.num_col_added_sp_ = []
         for level in range(len(self.subproblems)):
             self.num_col_added_sp_.append([0]*len(self.subproblems[level]))
@@ -197,6 +198,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
                 for sp_ind in range(len(self.subproblems[sp_level])):
                     self.time_elapsed_ = time() - t_start
                     if has_time_limit and self.time_elapsed_ > self.time_limit:
+                        self.time_limit_reached_ = True
                         break
                     generated_columns = self.subproblems[sp_level][sp_ind] \
                         .generate_columns(
@@ -212,7 +214,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
                     if rmp_updated:
                         break
                 self.time_elapsed_ = time() - t_start
-                if has_time_limit and self.time_elapsed_ > self.time_limit:
+                if self.time_limit_reached_:
                     print("Time limit reached!")
                     break
                 if rmp_updated:
@@ -220,7 +222,8 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
 
             if not rmp_updated:
                 print("RMP not updated. exiting the loop.")
-                self.mp_optimal_ = True
+                if not self.time_limit_reached_:
+                    self.mp_optimal_ = True
                 break
 
         if self.rmp_is_ip:

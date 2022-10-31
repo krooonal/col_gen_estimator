@@ -78,6 +78,8 @@ class Node:
     def __init__(self) -> None:
         self.id = -1
         self.candidate_splits = []
+        self.candidate_splits_count = []
+        self.last_split = -1
 
 
 class Leaf:
@@ -162,6 +164,12 @@ def get_params_from_string(params):
     """
     # TODO: Implement this method.
     solver_params = pywraplp.MPSolverParameters()
+    solver_params.SetIntegerParam(
+        pywraplp.MPSolverParameters.INCREMENTALITY,
+        pywraplp.MPSolverParameters.INCREMENTALITY_ON)
+    solver_params.SetIntegerParam(
+        pywraplp.MPSolverParameters.LP_ALGORITHM,
+        pywraplp.MPSolverParameters.PRIMAL)
     print(params)
     return solver_params
 
@@ -959,6 +967,7 @@ class DTreeClassifier(ColGenClassifier):
 
 class DTreeMasterProblemNew(DTreeMasterProblem):
     """TODO: Documentation.
+    Same as old master problem with beta constraints removed.
     """
 
     def __init__(self, initial_paths, leaves, nodes, splits):
@@ -1574,8 +1583,11 @@ class DTreeMasterProblemCuts(DTreeMasterProblem):
         for i in range(self.num_cuts_round):
             if result_status == pywraplp.Solver.OPTIMAL:
                 if (self.add_cuts()):
-                    result_status = self.solver_.Solve(
-                        get_params_from_string(solver_params))
+                    cuts_params = get_params_from_string(solver_params)
+                    cuts_params.SetIntegerParam(
+                        pywraplp.MPSolverParameters.LP_ALGORITHM,
+                        pywraplp.MPSolverParameters.DUAL)
+                    result_status = self.solver_.Solve(cuts_params)
                 else:
                     break
             else:
