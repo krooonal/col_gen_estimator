@@ -60,6 +60,12 @@ class BaseMasterProblem():
         """
         pass
 
+    def rmp_objective_improved(self):
+        """ (Optional) Returns True if objective value of rmp is improved. 
+        This is used for computing the number of improving iterations.
+        """
+        return False
+
 
 class BaseSubproblem():
     """ Base class for subproblem. One needs to extend this for using with
@@ -68,8 +74,35 @@ class BaseSubproblem():
 
     def generate_columns(self, X, y, dual_costs, params):
         """ Generates the new columns to be added to the RMP.
+        Parameters
+        ----------
+        X : ndarray, shape (n_samples, n_features)
+            The input.
+        y : ndarray, shape (n_samples,)
+            The labels.
+        dual_costs:
+            The dual costs and other information needed to update the
+            subproblem.
+        params:
+            The parameters for the subproblem. (TODO: Remove this.)
         """
         pass
+
+    def update_subproblem(self, X, y, dual_costs):
+        """ (Optional) Updates the subproblem model. This is useful when we add
+        more constraints to the master problem. The subproblem needs to be
+        updated to handle new dual cost information.
+        Parameters
+        ----------
+        X : ndarray, shape (n_samples, n_features)
+            The input.
+        y : ndarray, shape (n_samples,)
+            The labels.
+        dual_costs:
+            The dual costs and other information needed to update the
+            subproblem.
+        """
+        return
 
 
 class ColGenClassifier(ClassifierMixin, BaseEstimator):
@@ -84,10 +117,10 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
     time_limit : int, default=-1
         Time limit in seconds. Negative values removes the time limit.
     master_problem : Instance of BaseMasterProblem, default = BaseSubproblem()
-    subproblems : List of list of instances of BaseSubproblem according to 
+    subproblems : List of list of instances of BaseSubproblem according to
         their levels. The subproblems are called in increasing values of their
-        levels. The list of subproblems at level i+1 is given by 
-        subproblems[i+1]. The subproblems[i+1] are called only if the 
+        levels. The list of subproblems at level i+1 is given by
+        subproblems[i+1]. The subproblems[i+1] are called only if the
         subproblems[i] fail to generate any columns. Typically, the subproblem
         heuristics are passed at lower levels and the exact methods are passed
         at the higher levels. Default = [[BaseSubproblem()]]
@@ -176,40 +209,58 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         self.master_problem.generate_mp(X, self.processed_y_)
 
         self.performed_iter_ = 0
+        self.num_improving_iter_ = 0
         self.mp_optimal_ = False
         self.time_limit_reached_ = False
         self.num_col_added_sp_ = []
+        self.time_spent_sp_ = []
+        self.time_spent_master_ = 0.0
         for level in range(len(self.subproblems)):
             self.num_col_added_sp_.append([0]*len(self.subproblems[level]))
+            self.time_spent_sp_.append([0.0]*len(self.subproblems[level]))
 
         iter = 0
         while True:
-            if iter >= self.max_iterations:
+            if self.max_iterations > 0 and iter >= self.max_iterations:
                 break
             iter += 1
             print("Iteration number: ", iter)
             self.performed_iter_ += 1
+            master_time_start = time()
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
+            self.time_spent_master_ += time() - master_time_start
+            if self.master_problem.rmp_objective_improved():
+                self.num_improving_iter_ += 1
 
             rmp_updated = False
-            sp_ind = 0
+            # Update the subproblems
+            for sp_level in range(len(self.subproblems)):
+                for sp_ind in range(len(self.subproblems[sp_level])):
+                    self.subproblems[sp_level][sp_ind] \
+                        .update_subproblem(
+                            X, self.processed_y_, dual_costs)
+
             for sp_level in range(len(self.subproblems)):
                 # TODO: do this in parallel.
+                rmp_updated = False
                 for sp_ind in range(len(self.subproblems[sp_level])):
                     self.time_elapsed_ = time() - t_start
                     if has_time_limit and self.time_elapsed_ > self.time_limit:
                         self.time_limit_reached_ = True
                         break
+                    sp_time_start = time()
                     generated_columns = self.subproblems[sp_level][sp_ind] \
                         .generate_columns(
                         X, self.processed_y_, dual_costs,
                         self.subproblem_params[sp_level][sp_ind])
+                    sp_time_end = time()
 
-                    rmp_updated = False
                     for column in generated_columns:
                         col_added = self.master_problem.add_column(column)
                         self.num_col_added_sp_[
                             sp_level][sp_ind] += 1 if col_added else 0
+                        self.time_spent_sp_[
+                            sp_level][sp_ind] += sp_time_end - sp_time_start
                         rmp_updated = rmp_updated or col_added
                     if rmp_updated:
                         break

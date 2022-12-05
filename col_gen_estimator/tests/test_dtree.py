@@ -133,16 +133,22 @@ def data():
     splitA.id = 0
     splitA.feature = 0
     splitA.threshold = 0.5
+    splitA.left_rows = {4, 5, 6, 7}
+    splitA.right_rows = {0, 1, 2, 3}
 
     splitB = Split()
     splitB.id = 1
     splitB.feature = 1
     splitB.threshold = 0.5
+    splitB.left_rows = {2, 3, 6, 7}
+    splitB.right_rows = {0, 1, 4, 5}
 
     splitC = Split()
     splitC.id = 2
     splitC.feature = 2
     splitC.threshold = 0.5
+    splitC.left_rows = {1, 3, 5, 7}
+    splitC.right_rows = {0, 2, 4, 6}
 
     root_node = Node()
     root_node.id = 0
@@ -264,7 +270,7 @@ def test_master_prob(data):
     master_problem.generate_mp(X, y)
     assert_equal(master_problem.generated_, True)
     duals = master_problem.solve_rmp()
-    assert_equal(len(duals), 3)
+    assert_equal(len(duals), 5)
     leaf_duals = duals[0]
     row_duals = duals[1]
     ns_duals = duals[2]
@@ -285,18 +291,18 @@ def test_master_prob_add_col(data):
     master_problem.generate_mp(X, y)
     assert_equal(master_problem.generated_, True)
     duals = master_problem.solve_rmp()
-    assert_equal(len(duals), 3)
+    assert_equal(len(duals), 5)
     leaf_duals = duals[0]
     row_duals = duals[1]
     ns_duals = duals[2]
     assert_array_equal(leaf_duals, [2, 0, 0, 0])
-    assert_array_equal(row_duals, [0, -1, 0, 0, 0, 0, 0, 0])
+    assert_array_equal(row_duals, [0, 0, 0, 0, 0, 0, 0, 0])
     print_ns_duals(nodes, leaves, ns_duals)
 
     path_7 = data[2][-1]
     master_problem.add_column(path_7)
     duals = master_problem.solve_rmp()
-    assert_equal(len(duals), 3)
+    assert_equal(len(duals), 5)
     leaf_duals = duals[0]
     row_duals = duals[1]
     ns_duals = duals[2]
@@ -314,16 +320,10 @@ def test_subproblem(data):
     targets = data[6]
     subproblem = DTreeSubProblem(leaves[0], nodes, splits, targets, depth=2)
 
-    leaf_duals = [2, 0, 0, 0]
-    row_duals = [0, -1, 0, 0, 0, 0, 0, 0]
-    ns_duals = initialize_ns_duals(nodes, leaves)
-    ns_duals[0][1][1] = -1
-    ns_duals[1][1][1] = 1
-    ns_duals[1][1][2] = 2
-    ns_duals[2][0][0] = 2
-    ns_duals[3][0][0] = 1
+    leaf_duals, row_duals, ns_duals = get_incomplete_mp_duals(nodes, leaves)
 
-    duals = (leaf_duals, row_duals, ns_duals)
+    duals = (leaf_duals, row_duals, ns_duals, [], [])
+    subproblem.update_subproblem(X, y, duals)
     new_paths = subproblem.generate_columns(X, y, duals)
     assert_array_equal(new_paths, [])
 
@@ -337,16 +337,10 @@ def test_subproblem2(data):
     targets = data[6]
     subproblem = DTreeSubProblem(leaves[3], nodes, splits, targets, depth=2)
 
-    leaf_duals = [2, 0, 0, 0]
-    row_duals = [0, -1, 0, 0, 0, 0, 0, 0]
-    ns_duals = initialize_ns_duals(nodes, leaves)
-    ns_duals[0][1][1] = -1
-    ns_duals[1][1][1] = 1
-    ns_duals[1][1][2] = 2
-    ns_duals[2][0][0] = 2
-    ns_duals[3][0][0] = 1
+    leaf_duals, row_duals, ns_duals = get_incomplete_mp_duals(nodes, leaves)
 
-    duals = (leaf_duals, row_duals, ns_duals)
+    duals = (leaf_duals, row_duals, ns_duals, [], [])
+    subproblem.update_subproblem(X, y, duals)
     new_paths = subproblem.generate_columns(X, y, duals)
     assert_equal(len(new_paths), 1)
     path = new_paths[0]
@@ -367,16 +361,9 @@ def test_get_reduced_cost(data):
     subproblem_heuristic = DTreeSubProblemHeuristic(
         leaves, nodes, splits, targets, depth=2)
 
-    leaf_duals = [2, 0, 0, 0]
-    row_duals = [0, -1, 0, 0, 0, 0, 0, 0]
-    ns_duals = initialize_ns_duals(nodes, leaves)
-    ns_duals[0][1][1] = -1
-    ns_duals[1][1][1] = 1
-    ns_duals[1][1][2] = 2
-    ns_duals[2][0][0] = 2
-    ns_duals[3][0][0] = 1
+    leaf_duals, row_duals, ns_duals = get_incomplete_mp_duals(nodes, leaves)
 
-    duals = (leaf_duals, row_duals, ns_duals)
+    duals = (leaf_duals, row_duals, ns_duals, [], [])
     path = Path()
     path.leaf_id = 3
     path.node_ids = [0, 2]
@@ -388,7 +375,22 @@ def test_get_reduced_cost(data):
     row_satisfies_path_array[1] = True
     reduced_cost = subproblem_heuristic.get_reduced_cost(
         X, y, duals, path, row_satisfies_path_array)
+    # reduced_cost = 2
     assert(reduced_cost > 1e-6)
+
+
+def get_incomplete_mp_duals(nodes, leaves):
+    leaf_duals = [2, 0, 0, 0]
+    row_duals = [0, 0, 0, 0, 0, 0, 0, 0]
+    ns_duals = initialize_ns_duals(nodes, leaves)
+    ns_duals[0][1][1] = -1
+    ns_duals[1][1][1] = 1
+    ns_duals[1][1][2] = 2
+    ns_duals[2][0][0] = 1
+    ns_duals[2][2][1] = 1
+    ns_duals[3][0][0] = 1
+    ns_duals[3][2][1] = -1
+    return leaf_duals, row_duals, ns_duals
 
 
 def test_subproblem_heuristic1(data):
@@ -401,16 +403,26 @@ def test_subproblem_heuristic1(data):
     subproblem = DTreeSubProblemHeuristic(
         leaves, nodes, splits, targets, depth=2)
 
+    # leaf_duals = [2, 0, 0, 0]
+    # row_duals = [0, -1, 0, 0, 0, 0, 0, 0]
+    # ns_duals = initialize_ns_duals(nodes, leaves)
+    # ns_duals[0][1][1] = -1
+    # ns_duals[1][1][1] = 1
+    # ns_duals[1][1][2] = 2
+    # ns_duals[2][0][0] = 2
+    # ns_duals[3][0][0] = 1
     leaf_duals = [2, 0, 0, 0]
-    row_duals = [0, -1, 0, 0, 0, 0, 0, 0]
+    row_duals = [0, 0, 0, 0, 0, 0, 0, 0]
     ns_duals = initialize_ns_duals(nodes, leaves)
     ns_duals[0][1][1] = -1
     ns_duals[1][1][1] = 1
     ns_duals[1][1][2] = 2
-    ns_duals[2][0][0] = 2
+    ns_duals[2][0][0] = 1
+    ns_duals[2][2][1] = 1
     ns_duals[3][0][0] = 1
+    ns_duals[3][2][1] = -1
 
-    duals = (leaf_duals, row_duals, ns_duals)
+    duals = (leaf_duals, row_duals, ns_duals, [], [])
     random.seed(10)
     new_paths = subproblem.generate_columns(X, y, duals)
     assert_equal(len(new_paths), 1)
@@ -442,11 +454,13 @@ def test_fit_predict(data):
 
     assert_equal(clf.mp_optimal_, True)
     assert_equal(clf.performed_iter_, 2)
-    assert_equal(clf.num_col_added_sp_[0][0], 1)
+    total_cols_added = clf.num_col_added_sp_[
+        0][0] + sum(clf.num_col_added_sp_[1])
+    assert_equal(total_cols_added, 1)
+
     assert_equal(clf.num_col_added_sp_[1][0], 0)
     assert_equal(clf.num_col_added_sp_[1][1], 0)
     assert_equal(clf.num_col_added_sp_[1][2], 0)
-    assert_equal(clf.num_col_added_sp_[1][3], 0)
 
     y_pred = clf.predict(X)
     assert y_pred.shape == (X.shape[0],)

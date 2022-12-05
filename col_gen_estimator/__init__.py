@@ -6,15 +6,10 @@ from ._bdr_classifier import BDRSubProblem
 from ._bdr_classifier import BDRHeuristic
 from ._bdr_classifier import BooleanDecisionRuleClassifier
 from ._bdr_classifier import BooleanDecisionRuleClassifierWithHeuristic
-from ._dtree_classifier import Path, Node, Split, Leaf
+from ._dtree_classifier import Path, Node, Split, Leaf, Row
 from ._dtree_classifier import DTreeMasterProblem, DTreeSubProblem
 from ._dtree_classifier import DTreeClassifier
 from ._dtree_classifier import DTreeSubProblemHeuristic
-from ._dtree_classifier import DTreeMasterProblemNew, DTreeSubProblemNew
-from ._dtree_classifier import DTreeClassifierNew
-from ._dtree_classifier import DTreeSubProblemHeuristicNew
-from ._dtree_classifier import DTreeMasterProblemCuts
-from ._dtree_classifier import DTreeClassifierCuts
 
 from ._version import __version__
 
@@ -22,12 +17,7 @@ __all__ = ['BaseMasterProblem', 'BaseSubproblem', 'ColGenClassifier',
            'BDRMasterProblem', 'BDRSubProblem', 'BDRHeuristic',
            'BooleanDecisionRuleClassifier',
            'BooleanDecisionRuleClassifierWithHeuristic',
-           'Path', 'Node', 'Split', 'Leaf',
+           'Path', 'Node', 'Split', 'Leaf', 'Row',
            'DTreeMasterProblem', 'DTreeSubProblem', 'DTreeSubProblemHeuristic',
            'DTreeClassifier',
-           'DTreeMasterProblemNew', 'DTreeSubProblemNew',
-           'DTreeSubProblemHeuristicNew',
-           'DTreeClassifierNew',
-           'DTreeMasterProblemCuts',
-           'DTreeClassifierCuts',
            '__version__']
