@@ -403,24 +403,7 @@ def test_subproblem_heuristic1(data):
     subproblem = DTreeSubProblemHeuristic(
         leaves, nodes, splits, targets, depth=2)
 
-    # leaf_duals = [2, 0, 0, 0]
-    # row_duals = [0, -1, 0, 0, 0, 0, 0, 0]
-    # ns_duals = initialize_ns_duals(nodes, leaves)
-    # ns_duals[0][1][1] = -1
-    # ns_duals[1][1][1] = 1
-    # ns_duals[1][1][2] = 2
-    # ns_duals[2][0][0] = 2
-    # ns_duals[3][0][0] = 1
-    leaf_duals = [2, 0, 0, 0]
-    row_duals = [0, 0, 0, 0, 0, 0, 0, 0]
-    ns_duals = initialize_ns_duals(nodes, leaves)
-    ns_duals[0][1][1] = -1
-    ns_duals[1][1][1] = 1
-    ns_duals[1][1][2] = 2
-    ns_duals[2][0][0] = 1
-    ns_duals[2][2][1] = 1
-    ns_duals[3][0][0] = 1
-    ns_duals[3][2][1] = -1
+    leaf_duals, row_duals, ns_duals = get_incomplete_mp_duals(nodes, leaves)
 
     duals = (leaf_duals, row_duals, ns_duals, [], [])
     random.seed(10)

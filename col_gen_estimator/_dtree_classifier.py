@@ -1,18 +1,18 @@
 """
 Decision tree classifier using column generation.
 
-Reference: Murat Firat, Guillaume Crognier, Adriana F. Gabor, C.A.J. Hurkens, 
-and Yingqian Zhang. 
-Column generation based heuristic for learning classification trees. 
+Reference: Murat Firat, Guillaume Crognier, Adriana F. Gabor, C.A.J. Hurkens,
+and Yingqian Zhang.
+Column generation based heuristic for learning classification trees.
 Computers and Operations Research, 116, apr 2020.
 
-The algorithm takes candidate splits for each node of the decision tree as 
+The algorithm takes candidate splits for each node of the decision tree as
 inputs. A path is a set of nodes from root node to a leaf with a fixed split
-for each node and a assigned target. The master problem uses a binary variable 
-for each possible path. The goal is to select a set of path that are consistent 
-among themselves and result in the best accuracy. 
+for each node and a assigned target. The master problem uses a binary variable
+for each possible path. The goal is to select a set of path that are consistent
+among themselves and result in the best accuracy.
 
-Since there are exponentially many paths, the path variables are generated 
+Since there are exponentially many paths, the path variables are generated
 using column generation by a subproblem.
 
 We only work with complete trees. That is all the paths in the tree have the
@@ -42,14 +42,14 @@ Decision Variables
 x_p binary variable indicating that path p is assigned to leaf l.
 rho_{j,a} binary variable indicating that split a has been assigned to node j.
 
-	
+
 Max     sum_{l in N_{lf}} sum_{p in DP_{l}} CP(p)x_p
 s.t.    sum_{p in DP_{l}} x_p = 1,  forall l in  N_{lf}             (alpha)
-		sum_{lin N_{lf}} sum_{p in DP_{l}:r in R^l(p)} x_p = 1 
+		sum_{lin N_{lf}} sum_{p in DP_{l}:r in R^l(p)} x_p = 1
                                         forall r in R               (beta)
-		sum_{p in DP_{l}:s(j) = a} x_p = rho_{j,a}, 
-                                        forall l in N_{lf}, 
-                                            j in p_{BT}(l) and N_{int}, 
+		sum_{p in DP_{l}:s(j) = a} x_p = rho_{j,a},
+                                        forall l in N_{lf},
+                                            j in p_{BT}(l) and N_{int},
                                             a in S_j                (gamma)
 		x_p in {0,1},  forall p in DP_{l}, l in N_{lf}
 		rho_{j,a} in {0,1} forall j in N_{int}, a in S_j
@@ -58,7 +58,7 @@ The objective maximizes the accuracy. The (alpha) constraints ensure that
 exactly one path is selected for each leaf. The (beta) constraints ensure
 that exactly one path is selected for each row in the dataset. They are implied
 by the (alpha) and (gamma) constraints, but they are needed for stronger LP
-relaxation. The (gamma) constraints ensure that the selected paths are 
+relaxation. The (gamma) constraints ensure that the selected paths are
 consistent (have the same split on common nodes).
 
 Subproblem: (Modified from the original paper)
@@ -77,22 +77,22 @@ alpha_l dual cost of (alpha) constraint in the master problem for leaf l.
 beta_r dual cost of (beta) constraint in the master problem for row r.
 gamma_{l,j,a} dual cost of (gamma) constraint in the master problem for
         leaf l, node j, split a.
-		
+
 Decision Variables
 y_r binary variable indicating that row r reaches leaf l.
 z_r binary variable indicating that row r reaches leaf l and has the same
     target as the path being generated.
 u_{j,a} binary variable indicating that split a is assigned to node j.
 
-DPP(l): 
-Max sum_{r in R} z_r - alpha_l 
-    - sum_{j in p_{BT}(l)} sum_{a in S_j} gamma_{l,j,a} u_{j,a} 
+DPP(l):
+Max sum_{r in R} z_r - alpha_l
+    - sum_{j in p_{BT}(l)} sum_{a in S_j} gamma_{l,j,a} u_{j,a}
     - sum_{r in R} beta_r y_r
 s.t. sum_{a in S_j} u_{j,a} = 1,  forall j in  RC(l) or LC(l)               (1)
 	 y_r <= sum_{a in S_j and T(r)} u_{j,a}, forall j in LC(l), r in R      (2)
 	 y_r <= sum_{a in S_j and F(r)} u_{j,a} , forall j in RC(l), r in R     (3)
-	 sum_{j in LC(l)} sum_{a in S_j and T(r)} u_{j,a} 
-        + sum_{j in RC(l)} sum_{a in S_j and F(r)} u_{j,a} - (k-1) <= y_r, 
+	 sum_{j in LC(l)} sum_{a in S_j and T(r)} u_{j,a}
+        + sum_{j in RC(l)} sum_{a in S_j and F(r)} u_{j,a} - (k-1) <= y_r,
                                             forall r in R                   (4)
 	 sum_{j in p_{BT}(l)} u_{j,a} <= 1, forall a in (Union of all splits)   (5)
      z_r <= y_r, forall r in R                                              (6)
@@ -105,7 +105,7 @@ s.t. sum_{a in S_j} u_{j,a} = 1,  forall j in  RC(l) or LC(l)               (1)
 We have one subproblem for each leaf. This is different from the original paper
 where there is one subproblem for each leaf and target combination.
 
-The objective maximizes the reduced cost. The constraints (1) ensure that 
+The objective maximizes the reduced cost. The constraints (1) ensure that
 exactly one split is selected for each node. The constraints (2)(3)(4) ensure
 that the row follows the path when the corresponding splits are selected. The
 constraints (5) ensure that a split is only selected once in a path. The
@@ -142,14 +142,14 @@ class Row:
     target: (int) Target of the row.
     left_splits: (set(int)) IDs of the splits where the feature value of the
         row is smaller or equal to the threshold.
-    right_splits: (set(int)) IDs of the splits where the feature value of 
+    right_splits: (set(int)) IDs of the splits where the feature value of
         the row is greater than the threshold.
     removed_from_master: (bool) True if the row is removed from the master.
         This can happen if the row can only reach at max two leaves or the row
         is similar to some other row in the dataset with respect to the splits
         being considered.
     removed_from_sp: (bool) True if the row is removed from the master and the
-        subproblem. This can happen if the row is similar to some other row in 
+        subproblem. This can happen if the row is similar to some other row in
         the dataset with respect to the splits being considered.
     weight: (int) Typically = 1. Some rows can have higher weights if we remove
         the other rows that are similar to this row from the dataset.
@@ -192,7 +192,7 @@ class Path:
         self.target = -1
 
     def is_same_as(self, path):
-        """ Returns true if the current path is same as the path in the 
+        """ Returns true if the current path is same as the path in the
         argument.
         Parameters
         ----------
@@ -335,7 +335,7 @@ class Split:
     left_rows: (set(int)) IDs of the rows that take left branch on this split.
         This is used for faster computing of the rows that follow a particular
         path.
-    right_rows: (set(int)) IDs of the rows that take right branch on this 
+    right_rows: (set(int)) IDs of the rows that take right branch on this
         split.
     left_cuts: (set(int)) Indices of the cuts added as (beta) constraints that
         correspopnd to a row that take left branch on this split. This is used
@@ -361,7 +361,7 @@ def get_satisfied_rows(path, leaf, splits):
     Parameters
     ----------
     path: (Path) the path.
-    leaf: (Leaf) the leaf of the path. We pass this because the leaf contains 
+    leaf: (Leaf) the leaf of the path. We pass this because the leaf contains
         the information about which nodes take left branch for this path.
     splits: (list(Split)) splits to get the rows that take the correct branch.
     """
@@ -391,7 +391,7 @@ def get_satisfied_cuts(path, leaf, splits):
     Parameters
     ----------
     path: (Path) the path.
-    leaf: (Leaf) the leaf of the path. We pass this because the leaf contains 
+    leaf: (Leaf) the leaf of the path. We pass this because the leaf contains
         the information about which nodes take left branch for this path.
     splits: (list(Split)) splits to get the cuts that take the correct branch.
     """
@@ -524,6 +524,7 @@ class DTreeMasterProblem(BaseMasterProblem):
 
     def __init__(self, initial_paths, leaves, nodes, splits,
                  beta_constraints_as_cuts=False,
+                 generate_cuts=False,
                  num_cuts_round=0,
                  data_rows=None):
         super().__init__()
@@ -538,6 +539,7 @@ class DTreeMasterProblem(BaseMasterProblem):
         self.splits_ = splits
         self.data_rows = data_rows
         self.num_cuts_round = num_cuts_round
+        self.generate_cuts = generate_cuts
         self.beta_constraints_as_cuts = beta_constraints_as_cuts
         self.total_cuts_added = 0
         self.cut_gen_time = 0.0
@@ -1000,10 +1002,11 @@ class DTreeMasterProblem(BaseMasterProblem):
             if self.rmp_result_status == pywraplp.Solver.OPTIMAL:
                 self.store_lp_solution()
                 t_start = time()
+                cut_rows = []
                 added_beta_cuts = False
                 if self.beta_constraints_as_cuts:
                     added_beta_cuts = self.add_beta_cuts()
-                if not added_beta_cuts:
+                if self.generate_cuts and not added_beta_cuts:
                     cut_rows = self.add_cuts()
                 t_end = time()
                 # print("Added ", len(cut_rows), " cuts in ", t_end - t_start)
@@ -1139,6 +1142,7 @@ class DTreeSubProblem(BaseSubproblem):
         """
         assert not self.generated_, "SP is already created."
         infinity = self.solver_.infinity()
+        self.solver_.SetNumThreads(7)
 
         n_rows = self.X_.shape[0]
         # Binary variables indicating that row reaches the leaf and has the
@@ -1152,7 +1156,7 @@ class DTreeSubProblem(BaseSubproblem):
             if self.data_rows != None:
                 if self.data_rows[i].removed_from_sp:
                     continue
-                obj_coeff = self.data_rows[i].weight
+                # obj_coeff = self.data_rows[i].weight
             z_var = self.solver_.BoolVar('z_'+str(i))
             objective.SetCoefficient(z_var, obj_coeff)
             self.z_vars_[i] = z_var.index()
@@ -1284,7 +1288,7 @@ class DTreeSubProblem(BaseSubproblem):
             if self.data_rows != None:
                 if self.data_rows[i].removed_from_sp:
                     continue
-                obj_coeff = self.data_rows[i].weight
+                # obj_coeff = self.data_rows[i].weight
             z_var = self.solver_.variable(self.z_vars_[i])
             objective.SetCoefficient(z_var, obj_coeff)
 
@@ -1337,15 +1341,14 @@ class DTreeSubProblem(BaseSubproblem):
                 cn_cons.SetCoefficient(yc_var, 1)
                 if node.id in self.leaf_.left_nodes:
                     for split in node.candidate_splits:
-                        if self.row_satisfies_split(i, self.splits_[split]):
+                        if cut_rows[i][split]:
                             u_var = self.solver_.variable(
                                 self.u_vars_[node.id][split])
                             cn_cons.SetCoefficient(u_var, -1)
                             yc_lb_cons.SetCoefficient(u_var, 1)
                 elif node.id in self.leaf_.right_nodes:
                     for split in node.candidate_splits:
-                        if not self.row_satisfies_split(i,
-                                                        self.splits_[split]):
+                        if not cut_rows[i][split]:
                             u_var = self.solver_.variable(
                                 self.u_vars_[node.id][split])
                             cn_cons.SetCoefficient(u_var, -1)
@@ -1398,12 +1401,13 @@ class DTreeSubProblem(BaseSubproblem):
                 break
         n_rows = self.X_.shape[0]
         for i in range(n_rows):
+            obj_coeff = 1
             if self.data_rows != None:
                 if self.data_rows[i].removed_from_sp:
                     continue
                 obj_coeff = self.data_rows[i].weight
             z_var = self.solver_.variable(self.z_vars_[i])
-            obj_coeff = 1
+
             path.cost += obj_coeff * z_var.solution_value()
             # if z_var.solution_value() > 0.5:
             #     print(self.z_vars_[i], z_var)
@@ -1436,6 +1440,408 @@ class DTreeSubProblem(BaseSubproblem):
         return False
 
 
+class PathGenerator(cp_model.CpSolverSolutionCallback):
+    """Track intermediate solutions of sp.
+    Attributes
+    ----------
+    TODO
+    """
+
+    def __init__(self, u_vars, w_vars, z_vars, y_vars,
+                 yc_vars,
+                 leaf_dual,
+                 leaf, targets,
+                 nodes,
+                 orig_obj_coeffs):
+        cp_model.CpSolverSolutionCallback.__init__(self)
+        self.u_vars = u_vars
+        self.w_vars = w_vars
+        self.z_vars = z_vars
+        self.y_vars = y_vars
+        self.yc_vars = yc_vars
+        self.leaf = leaf
+        self.leaf_dual = leaf_dual
+        self.targets = targets
+        self.nodes = nodes
+        self.orig_obj_coeffs = orig_obj_coeffs
+        self.solution_count = 0
+        self.paths = []
+
+    def on_solution_callback(self):
+        self.solution_count += 1
+        original_objective = 0.0
+        path_cost = 0.0
+        for z_var in self.z_vars:
+            if z_var == None:
+                continue
+            path_cost += self.orig_obj_coeffs[z_var] * \
+                self.Value(z_var)
+
+        original_objective += path_cost
+
+        for y_var in self.y_vars:
+            if y_var == None:
+                continue
+            original_objective += self.orig_obj_coeffs[y_var] * \
+                self.Value(y_var)
+
+        for yc_var in self.yc_vars:
+            original_objective += self.orig_obj_coeffs[yc_var] * \
+                self.Value(yc_var)
+
+        nodes = self.leaf.left_nodes + self.leaf.right_nodes
+        for node_id in nodes:
+            node = self.nodes[node_id]
+            for split in node.candidate_splits:
+                u_var = self.u_vars[node.id][split]
+                original_objective += self.orig_obj_coeffs[u_var] * \
+                    self.Value(u_var)
+
+        original_objective -= self.leaf_dual
+
+        if original_objective <= 1e-6:
+            return
+
+        nodes = self.leaf.left_nodes + self.leaf.right_nodes
+        path = Path()
+        path.leaf_id = self.leaf.id
+        path.node_ids = []
+        path.splits = []
+        path.cost = path_cost
+        path.id = -1
+        for node_id in nodes:
+            node = self.nodes[node_id]
+            path.node_ids.append(node.id)
+            for split in node.candidate_splits:
+                u_var = self.u_vars[node.id][split]
+                if self.Value(u_var) > 0.5:
+                    path.splits.append(split)
+                    break
+        for target in self.targets:
+            w_var = self.w_vars[target]
+            if self.Value(w_var) > 0.5:
+                path.target = target
+                break
+        self.paths.append(path)
+        # print("Path cost", path_cost)
+
+
+class DTreeSubProblemSat(BaseSubproblem):
+    """TODO: Documentation."""
+
+    def __init__(self, leaf, nodes, splits, targets,
+                 depth, data_rows=None) -> None:
+        super().__init__()
+        self.leaf_id_ = leaf.id
+        self.leaf_ = leaf
+        self.nodes_ = nodes
+        self.splits_ = splits
+        self.targets_ = targets
+        self.tree_depth_ = depth
+        self.model_ = cp_model.CpModel()
+        self.objective_scale = 1000
+        self.orig_obj_coeffs = {}
+        self.generated_ = False
+        self.z_vars_ = None
+        self.yc_vars_ = None
+        self.data_rows = data_rows
+        self.cut_rows_starting_index = 0
+
+    def scale_obj_coeff(self, value):
+        return int(round(value * self.objective_scale))
+
+    def create_submip(self, leaf_dual, row_duals, ns_duals, cut_duals):
+        """TODO: Documentation.
+        """
+        assert not self.generated_, "SP is already created."
+
+        # obj = cp_model.LinearExpr()
+
+        n_rows = self.X_.shape[0]
+        # Binary variables indicating that row reaches the leaf and has the
+        # correct target.
+        self.z_vars_ = [None]*n_rows
+        # Binary variables indicating that row reaches the leaf.
+        self.y_vars_ = [None]*n_rows
+        obj_vars = []
+        obj_coeffs = []
+
+        for i in range(n_rows):
+            z_coeff = 1
+            if self.data_rows != None:
+                if self.data_rows[i].removed_from_sp:
+                    continue
+                z_coeff = self.data_rows[i].weight
+            z_var = self.model_.NewBoolVar('z_'+str(i))
+            self.orig_obj_coeffs[z_var] = z_coeff
+            z_coeff = self.scale_obj_coeff(z_coeff)
+            self.z_vars_[i] = (z_var)
+            # obj += cp_model.LinearExpr.Term(z_var, z_coeff)
+            obj_vars.append(z_var)
+            obj_coeffs.append(z_coeff)
+
+            y_var = self.model_.NewBoolVar('y_'+str(i))
+            self.orig_obj_coeffs[y_var] = -row_duals[i]
+            y_coeff = self.scale_obj_coeff(-row_duals[i])
+            self.y_vars_[i] = (y_var)
+            # obj += cp_model.LinearExpr.Term(y_var, y_coeff)
+            obj_vars.append(y_var)
+            obj_coeffs.append(y_coeff)
+
+        num_cuts = len(cut_duals)
+        self.yc_vars_ = [None]*num_cuts
+        if num_cuts > 0:
+            for i in range(num_cuts):
+                yc_var = self.model_.NewBoolVar('yc_'+str(i))
+                self.orig_obj_coeffs[yc_var] = -cut_duals[i]
+                yc_coeff = self.scale_obj_coeff(-cut_duals[i])
+                self.yc_vars_.append(yc_var)
+                # obj += cp_model.LinearExpr.Term(yc_var, yc_coeff)
+                obj_vars.append(yc_var)
+                obj_coeffs.append(yc_coeff)
+
+        # Binary variables u_j_a indicating that split s is assigned to the
+        # node j.
+        self.u_vars_ = {}
+        nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
+        all_splits = []
+        for node_id in nodes:
+            node = self.nodes_[node_id]
+            self.u_vars_[node.id] = {}
+            for split in node.candidate_splits:
+                all_splits.append(split)
+                u_var = self.model_.NewBoolVar(
+                    'u_'+str(node.id)+'_'+str(split))
+                self.orig_obj_coeffs[u_var] = \
+                    -ns_duals[self.leaf_id_][node.id][split]
+                u_coeff = self.scale_obj_coeff(
+                    -ns_duals[self.leaf_id_][node.id][split])
+                self.u_vars_[node.id][split] = u_var
+                # obj += cp_model.LinearExpr.Term(u_var, u_coeff)
+                obj_vars.append(u_var)
+                obj_coeffs.append(u_coeff)
+
+        # obj += -self.scale_obj_coeff(leaf_dual)
+        obj = cp_model.LinearExpr.WeightedSum(obj_vars, obj_coeffs) - leaf_dual
+        self.model_.Maximize(obj)
+
+        # Constraints
+        # For each node, exactly one feature is selected
+        for node_id in nodes:
+            node = self.nodes_[node_id]
+            cons_vars = []
+            for split in node.candidate_splits:
+                u_var = self.u_vars_[node.id][split]
+                cons_vars.append(u_var)
+            self.model_.Add(cp_model.LinearExpr.Sum(cons_vars) == 1)
+
+        # Each feature is selected at max once in a path
+        # all_splits = list(dict.fromkeys(all_splits))
+        # for split in all_splits:
+        #     cons_vars = []
+        #     for node_id in nodes:
+        #         node = self.nodes_[node_id]
+        #         if split not in node.candidate_splits:
+        #             continue
+        #         u_var = self.u_vars_[node.id][split]
+        #         cons_vars.append(u_var)
+        #     self.model_.Add(cp_model.LinearExpr.Sum(cons_vars) <= 1)
+
+        # Row follows correct path (upper and lower bound on y var)
+        for i in range(n_rows):
+            if self.data_rows != None:
+                if self.data_rows[i].removed_from_sp:
+                    continue
+            y_lb_expr = cp_model.LinearExpr.Term(self.y_vars_[i], -1)
+            for node_id in nodes:
+                node = self.nodes_[node_id]
+                rn_expr = cp_model.LinearExpr.Term(self.y_vars_[i], 1)
+
+                if node.id in self.leaf_.left_nodes:
+                    for split in node.candidate_splits:
+                        if self.row_satisfies_split(i, self.splits_[split]):
+                            u_var = self.u_vars_[node.id][split]
+                            rn_expr += cp_model.LinearExpr.Term(u_var, -1)
+                            y_lb_expr += cp_model.LinearExpr.Term(u_var, 1)
+                elif node.id in self.leaf_.right_nodes:
+                    for split in node.candidate_splits:
+                        if not self.row_satisfies_split(i,
+                                                        self.splits_[split]):
+                            u_var = self.u_vars_[node.id][split]
+                            rn_expr += cp_model.LinearExpr.Term(u_var, -1)
+                            y_lb_expr += cp_model.LinearExpr.Term(u_var, 1)
+                self.model_.Add(rn_expr <= 0)
+            self.model_.Add(y_lb_expr <= self.tree_depth_-1)
+
+        # only one class selected
+        # Binary variables indicating that the class is selected.
+        self.w_vars_ = [None]*len(self.targets_)
+        for i in range(len(self.targets_)):
+            target = self.targets_[i]
+            w_var = self.model_.NewBoolVar('w_'+str(target))
+            self.w_vars_[i] = w_var
+        # Note: This can be added as <= 1 inequality because of the objective.
+        self.model_.Add(cp_model.LinearExpr.Sum(self.w_vars_) == 1)
+
+        # relation between w,y,z vars
+        for i in range(n_rows):
+            if self.data_rows != None:
+                if self.data_rows[i].removed_from_sp:
+                    continue
+            # z <= y (row reaches leaf)
+            self.model_.Add(self.z_vars_[i] <= self.y_vars_[i])
+
+            # z <= w (row has correct target)
+            correct_class = self.y_[i]
+            self.model_.Add(self.z_vars_[i] <= self.w_vars_[correct_class])
+
+        self.generated_ = True
+
+    def update_objective(self, leaf_dual, row_duals, ns_duals, cut_duals):
+        """TODO: Documentation.
+        """
+        assert self.generated_, "Called update_objective before generating SP"
+        # obj = cp_model.LinearExpr()
+        obj_vars = []
+        obj_coeffs = []
+
+        n_rows = self.X_.shape[0]
+
+        for i in range(n_rows):
+            z_coeff = 1
+            if self.data_rows != None:
+                if self.data_rows[i].removed_from_sp:
+                    continue
+                z_coeff = self.data_rows[i].weight
+            z_var = self.z_vars_[i]
+            self.orig_obj_coeffs[z_var] = z_coeff
+            z_coeff = self.scale_obj_coeff(z_coeff)
+
+            # obj += cp_model.LinearExpr.Term(z_var, z_coeff)
+            obj_vars.append(z_var)
+            obj_coeffs.append(z_coeff)
+
+            y_coeff = self.scale_obj_coeff(-row_duals[i])
+            y_var = self.y_vars_[i]
+            self.orig_obj_coeffs[y_var] = -row_duals[i]
+            # obj += cp_model.LinearExpr.Term(y_var, y_coeff)
+            obj_vars.append(y_var)
+            obj_coeffs.append(y_coeff)
+
+        num_cuts = len(cut_duals)
+        existing_cuts = len(self.yc_vars_)
+        self.yc_vars_ = [None]*num_cuts
+        if num_cuts > 0:
+            for i in range(num_cuts):
+                yc_var = None
+                if i >= existing_cuts:
+                    yc_var = self.model_.NewBoolVar('yc_'+str(i))
+                    self.yc_vars_.append(yc_var)
+                else:
+                    yc_var = self.yc_vars_[i]
+                yc_coeff = self.scale_obj_coeff(-cut_duals[i])
+                self.orig_obj_coeffs[yc_var] = -cut_duals[i]
+                # obj += cp_model.LinearExpr.Term(yc_var, yc_coeff)
+                obj_vars.append(yc_var)
+                obj_coeffs.append(yc_coeff)
+
+        # Binary variables u_j_a indicating that split s is assigned to the
+        # node j.
+        nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
+        for node_id in nodes:
+            node = self.nodes_[node_id]
+            for split in node.candidate_splits:
+                u_coeff = self.scale_obj_coeff(
+                    -ns_duals[self.leaf_id_][node.id][split])
+                u_var = self.u_vars_[node.id][split]
+                self.orig_obj_coeffs[u_var] = \
+                    -ns_duals[self.leaf_id_][node.id][split]
+                # obj += cp_model.LinearExpr.Term(u_var, u_coeff)
+                obj_vars.append(u_var)
+                obj_coeffs.append(u_coeff)
+
+        # obj -= self.scale_obj_coeff(leaf_dual)
+        obj = cp_model.LinearExpr.WeightedSum(obj_vars, obj_coeffs) - leaf_dual
+        self.model_.Maximize(obj)
+        return
+
+    def add_cut_rows(self, cut_rows):
+        assert self.generated_
+        nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
+        n_cut_rows = len(cut_rows)
+        # Row follows correct path (upper and lower bound on y var)
+        for i in range(n_cut_rows):
+            cut_index = i + self.cut_rows_starting_index
+            yc_lb_expr = cp_model.LinearExpr.Term(self.yc_vars_[cut_index], -1)
+            for node_id in nodes:
+                node = self.nodes_[node_id]
+                cn_expr = cp_model.LinearExpr.Term(self.yc_vars_[cut_index], 1)
+
+                if node.id in self.leaf_.left_nodes:
+                    for split in node.candidate_splits:
+                        if cut_rows[i][split]:
+                            u_var = self.u_vars_[node.id][split]
+                            cn_expr += cp_model.LinearExpr.Term(u_var, -1)
+                            yc_lb_expr += cp_model.LinearExpr.Term(u_var, 1)
+                elif node.id in self.leaf_.right_nodes:
+                    for split in node.candidate_splits:
+                        if not cut_rows[i][split]:
+                            u_var = self.u_vars_[node.id][split]
+                            cn_expr += cp_model.LinearExpr.Term(u_var, -1)
+                            yc_lb_expr += cp_model.LinearExpr.Term(u_var, 1)
+                self.model_.Add(cn_expr <= 0)
+            self.model_.Add(yc_lb_expr <= self.tree_depth_-1)
+        self.cut_rows_starting_index += n_cut_rows
+
+    def update_subproblem(self, X, y, dual_costs):
+        self.X_ = X
+        self.y_ = y
+        leaf_dual = dual_costs[0][self.leaf_id_]
+        row_duals = dual_costs[1]
+        ns_duals = dual_costs[2]
+        cut_duals = dual_costs[3]
+        cut_rows = dual_costs[4]
+
+        if self.generated_:
+            self.update_objective(leaf_dual, row_duals, ns_duals, cut_duals)
+        else:
+            self.create_submip(leaf_dual, row_duals, ns_duals, cut_duals)
+
+        if len(cut_rows) > 0:
+            self.add_cut_rows(cut_rows)
+
+    def row_satisfies_split(self, row, split):
+        """TODO: Documentation.
+        """
+        feature = split.feature
+        threshold = split.threshold
+        if self.X_[row, feature] <= threshold:
+            return True
+        return False
+
+    def generate_columns(self, X, y, dual_costs, params=""):
+        """TODO: Documentation.
+        """
+
+        # Solve sub problem
+        sp_solver = cp_model.CpSolver()
+        sp_solver.parameters.num_search_workers = 7
+
+        # Solve
+        leaf_dual = dual_costs[0][self.leaf_id_]
+        path_generator = PathGenerator(self.u_vars_, self.w_vars_, self.z_vars_,
+                                       self.y_vars_,
+                                       self.yc_vars_, leaf_dual, self.leaf_,
+                                       self.targets_,
+                                       self.nodes_,
+                                       self.orig_obj_coeffs)
+        status = sp_solver.Solve(self.model_, path_generator)
+        print("Path generation status: ", sp_solver.StatusName(status))
+        print("Path generation objective: ", sp_solver.ObjectiveValue())
+        paths = path_generator.paths
+        return paths
+
+
 class DTreeSubProblemHeuristic(BaseSubproblem):
     """TODO: Documentation."""
 
@@ -1457,6 +1863,7 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
         # Generate random columns and return the ones with postive reduced
         # cost.
         generated_paths = []
+        return generated_paths
         for iter in range(100):
             path = Path()
             # Pick a leaf
@@ -1498,7 +1905,7 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
                 row_satisfies_path_array[row] = True
                 row_weight = 1
                 if self.data_rows != None:
-                    row_weight = self.data_rows[row].weight
+                    # row_weight = self.data_rows[row].weight
                     if self.data_rows[row].removed_from_sp:
                         continue
 
@@ -1534,7 +1941,7 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
             else:
                 self.failed_rounds += 1
 
-            self.success_rounds += len(generated_paths)
+        self.success_rounds += len(generated_paths)
 
         return generated_paths
 
@@ -1595,6 +2002,7 @@ class DTreeClassifier(ColGenClassifier):
                  time_limit=-1,
                  num_master_cuts_round=3,
                  master_beta_constraints_as_cuts=False,
+                 master_generate_cuts=False,
                  data_rows=None,
                  rmp_is_ip=True,
                  rmp_solver_params="",
@@ -1607,6 +2015,10 @@ class DTreeClassifier(ColGenClassifier):
         self.tree_depth = tree_depth
         self.targets = targets
         self.subproblem_params = subproblem_params
+        self.num_master_cuts_round = num_master_cuts_round
+        self.master_beta_constraints_as_cuts = master_beta_constraints_as_cuts
+        self.master_generate_cuts = master_generate_cuts
+        self.data_rows = data_rows
         split_ids = []
         for split in splits:
             split_ids.append(split.id)
@@ -1640,6 +2052,7 @@ class DTreeClassifier(ColGenClassifier):
             self.initial_paths, self.leaves, self.nodes, self.splits,
             num_cuts_round=num_master_cuts_round,
             beta_constraints_as_cuts=master_beta_constraints_as_cuts,
+            generate_cuts=master_generate_cuts,
             data_rows=data_rows)
         self.subproblems = []
         all_subproblem_params = []
@@ -1651,9 +2064,13 @@ class DTreeClassifier(ColGenClassifier):
         self.subproblems.append([])
         all_subproblem_params.append([])
         for leaf in self.leaves:
-            subproblem = DTreeSubProblem(
+            # subproblem = DTreeSubProblem(
+            #     leaf, self.nodes, self.splits, self.targets,
+            #     self.tree_depth, optimization_problem_type='sat',
+            #     data_rows=data_rows)
+            subproblem = DTreeSubProblemSat(
                 leaf, self.nodes, self.splits, self.targets,
-                self.tree_depth, optimization_problem_type='sat',
+                self.tree_depth,
                 data_rows=data_rows)
             self.subproblems[1].append(subproblem)
             all_subproblem_params[1].append(subproblem_params)
