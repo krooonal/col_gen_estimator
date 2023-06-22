@@ -1,3 +1,0 @@
-col_add_time,heuristic_hit_rate,master_ip_time,master_num_cuts,master_time,mster_cuts_time,name,num_improving_iter,preprocessing_time,sp_cols_added_heuristic,sp_cols_added_ip,sp_time_heuristic,sp_time_ip,test_accuracy,total_iterations,train_accuracy,training_time
-0.0,0.0,0.0,0,0.0,0.0,CART,0,0.0,0,0,0.0,0.0,0.7708333333333334,0,0.8559498956158664,0.002485990524291992
-0.20615911483764648,0.045263157894736845,0.08214497566223145,190,2.7312121391296387,0.031595706939697266,CG1,94,2.691457986831665,774,29,0.8308866024017334,3.1620101928710938,0.775,171,0.8643006263048016,7.418277025222778
