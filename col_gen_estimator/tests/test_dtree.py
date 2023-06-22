@@ -265,7 +265,8 @@ def test_master_prob(data):
     nodes = data[3]
     leaves = data[4]
     splits = data[5]
-    master_problem = DTreeMasterProblem(paths, leaves, nodes, splits)
+    master_problem = DTreeMasterProblem(
+        paths, leaves, nodes, splits, solver_type='glop')
     assert_equal(master_problem.generated_, False)
     master_problem.generate_mp(X, y)
     assert_equal(master_problem.generated_, True)
@@ -274,7 +275,7 @@ def test_master_prob(data):
     leaf_duals = duals[0]
     row_duals = duals[1]
     ns_duals = duals[2]
-    assert_array_equal(leaf_duals, [2, 0, 4, 0])
+    assert_array_equal(leaf_duals, [2, 2, 1, 3])
     assert_array_equal(row_duals, [0, 0, 0, 0, 0, 0, 0, 0])
     print_ns_duals(nodes, leaves, ns_duals)
 
@@ -286,7 +287,8 @@ def test_master_prob_add_col(data):
     nodes = data[3]
     leaves = data[4]
     splits = data[5]
-    master_problem = DTreeMasterProblem(paths, leaves, nodes, splits)
+    master_problem = DTreeMasterProblem(
+        paths, leaves, nodes, splits, solver_type='glop')
     assert_equal(master_problem.generated_, False)
     master_problem.generate_mp(X, y)
     assert_equal(master_problem.generated_, True)
@@ -295,7 +297,7 @@ def test_master_prob_add_col(data):
     leaf_duals = duals[0]
     row_duals = duals[1]
     ns_duals = duals[2]
-    assert_array_equal(leaf_duals, [2, 0, 0, 0])
+    assert_array_equal(leaf_duals, [2, 2, 0, 2])
     assert_array_equal(row_duals, [0, 0, 0, 0, 0, 0, 0, 0])
     print_ns_duals(nodes, leaves, ns_duals)
 
@@ -306,7 +308,7 @@ def test_master_prob_add_col(data):
     leaf_duals = duals[0]
     row_duals = duals[1]
     ns_duals = duals[2]
-    assert_array_equal(leaf_duals, [2, 0, 2, 0])
+    assert_array_equal(leaf_duals, [2, 2, 1, 3])
     assert_array_equal(row_duals, [0, 0, 0, 0, 0, 0, 0, 0])
     print_ns_duals(nodes, leaves, ns_duals)
 
@@ -425,18 +427,19 @@ def test_fit_predict(data):
     leaves = data[4]
     splits = data[5]
     clf = DTreeClassifier(paths, leaves, nodes, splits,
-                          tree_depth=2, targets=[0, 1], max_iterations=5)
+                          tree_depth=2, targets=[0, 1], max_iterations=5,
+                          master_solver_type='glop')
     clf.fit(X, y)
     assert hasattr(clf, 'is_fitted_')
     assert hasattr(clf, 'classes_')
     assert hasattr(clf, 'X_')
     assert hasattr(clf, 'y_')
     assert hasattr(clf, 'mp_optimal_')
-    assert hasattr(clf, 'performed_iter_')
+    assert hasattr(clf, 'iter_')
     assert hasattr(clf, 'num_col_added_sp_')
 
     assert_equal(clf.mp_optimal_, True)
-    assert_equal(clf.performed_iter_, 2)
+    assert_equal(clf.iter_, 2)
     total_cols_added = clf.num_col_added_sp_[
         0][0] + sum(clf.num_col_added_sp_[1])
     assert_equal(total_cols_added, 1)

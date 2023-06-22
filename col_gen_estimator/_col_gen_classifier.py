@@ -226,12 +226,19 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
                 break
             self.iter_ += 1
             print("Iteration number: ", self.iter_)
-            self.performed_iter_ += 1
+            print("Time elapsed: ", time() - t_start)
             master_time_start = time()
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
             self.time_spent_master_ += time() - master_time_start
             if self.master_problem.rmp_objective_improved():
                 self.num_improving_iter_ += 1
+
+            # TODO:Remove this.
+            if hasattr(self.master_problem, 'reset_timer_'):
+                if self.master_problem.reset_timer_:
+                    t_start = time()
+                    self.master_problem.reset_timer_ = False
+                    print("Reset timer.")
 
             rmp_updated = False
             # Update the subproblems

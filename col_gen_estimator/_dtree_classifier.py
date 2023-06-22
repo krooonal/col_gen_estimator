@@ -190,6 +190,7 @@ class Path:
         self.cost = 0
         self.id = -1
         self.target = -1
+        self.initial = False
 
     def is_same_as(self, path):
         """ Returns true if the current path is same as the path in the
@@ -348,6 +349,8 @@ class Split:
         self.id = -1
         self.feature = -1
         self.threshold = -1
+        # In reduced split case, some splits are removed.
+        self.removed = False
         self.left_rows = set()
         self.right_rows = set()
         self.left_cuts = set()
@@ -486,6 +489,7 @@ class CutGenerator(cp_model.CpSolverSolutionCallback):
 
     def __init__(self, path_vars, split_vars, orig_path_coeffs):
         cp_model.CpSolverSolutionCallback.__init__(self)
+        # path_vars are updated after each col gen iter.
         self.path_vars = path_vars
         self.split_vars = split_vars
         self.solution_count = 0
@@ -526,14 +530,16 @@ class DTreeMasterProblem(BaseMasterProblem):
                  beta_constraints_as_cuts=False,
                  generate_cuts=False,
                  num_cuts_round=0,
+                 solver_type='glop',
                  data_rows=None):
         super().__init__()
         # TODO: Switch to glop for testing.
-        self.solver_ = pywraplp.Solver.CreateSolver('glop')
+        self.solver_ = pywraplp.Solver.CreateSolver(solver_type)
         self.cut_gen_model_ = cp_model.CpModel()
         self.cut_obj_scale = 1000000
         self.generated_ = False
         self.paths_ = initial_paths
+        self.generated_paths_ = set()
         self.leaves_ = leaves
         self.nodes_ = nodes
         self.splits_ = splits
@@ -544,6 +550,10 @@ class DTreeMasterProblem(BaseMasterProblem):
         self.total_cuts_added = 0
         self.cut_gen_time = 0.0
         self.rmp_objective_ = 0.0
+        self.iter_ = 0
+        # Experimental
+        self.last_reset_iter_ = 0
+        self.reset_timer_ = False
 
     def create_cut_gen_model(self):
         """Creates the model for cut generation using a CP-SAT solver."""
@@ -633,6 +643,8 @@ class DTreeMasterProblem(BaseMasterProblem):
 
         if self.data_rows == None:
             self.data_rows = self.preprocess_rows()
+        else:
+            self.compute_satisfied_paths()
         # row constraints
         n_rows = self.X_.shape[0]
         self.row_cons_ = [None]*n_rows
@@ -644,7 +656,8 @@ class DTreeMasterProblem(BaseMasterProblem):
             if self.data_rows[r].removed_from_master:
                 continue
             self.added_row[r] = True
-            self.row_cons_[r] = self.solver_.Constraint(1, 1, "row_"+str(r))
+            self.row_cons_[
+                r] = self.solver_.Constraint(-infinity, 1, "row_"+str(r))
             for path in self.paths_:
                 if row_satisfies_path(X[r], self.leaves_[path.leaf_id],
                                       self.splits_, path):
@@ -667,8 +680,11 @@ class DTreeMasterProblem(BaseMasterProblem):
 
                     ns_var_ind = self.ns_vars[(node.id, split)] \
                         if (node.id, split) in self.ns_vars \
-                        else self.solver_.BoolVar("r_ns_" + str(node.id) +
-                                                  "_"+str(split)).index()
+                        else self.solver_.IntVar(0.0, infinity, "r_ns_" +
+                                                 str(node.id) +
+                                                 "_"+str(split)).index()
+                    # else self.solver_.BoolVar("r_ns_" + str(node.id) +
+                    #                           "_"+str(split)).index()
                     self.ns_vars[(node.id, split)] = ns_var_ind
 
                     ns_var = self.solver_.variable(ns_var_ind)
@@ -699,6 +715,13 @@ class DTreeMasterProblem(BaseMasterProblem):
         for xp_var_id in self.path_vars_:
             xp_var = self.solver_.variable(xp_var_id)
             self.path_solution_values[xp_var_id] = xp_var.solution_value()
+
+    def compute_satisfied_paths(self):
+        for r, data_row in enumerate(self.data_rows):
+            for path in self.paths_:
+                if row_satisfies_path(self.X_[r], self.leaves_[path.leaf_id],
+                                      self.splits_, path):
+                    data_row.reachable_paths.add(path.id)
 
     def preprocess_rows(self, aggressive=False):
         """TODO: Documentation."""
@@ -836,6 +859,7 @@ class DTreeMasterProblem(BaseMasterProblem):
         path.id = xp_var.index()
         objective.SetCoefficient(xp_var, path.cost)
         self.paths_.append(path)
+        self.generated_paths_.add(path.id)
 
         # leaf constraints
         for leaf in self.leaves_:
@@ -846,6 +870,7 @@ class DTreeMasterProblem(BaseMasterProblem):
         satisfied_rows = get_satisfied_rows(
             path, self.leaves_[path.leaf_id], self.splits_)
         for r in satisfied_rows:
+            self.data_rows[r].reachable_paths.add(path.id)
             if not self.added_row[r]:
                 continue
             self.row_cons_[r].SetCoefficient(xp_var, 1)
@@ -936,7 +961,7 @@ class DTreeMasterProblem(BaseMasterProblem):
         for cut in cuts:
             r = len(self.cut_cons_)
             self.cut_cons_.append(self.solver_.Constraint(
-                1, 1, "row_"+str(r)))
+                1, 1, "cut_"+str(r)))
             self.added_row.append(True)
 
             for i, path in enumerate(self.paths_):
@@ -962,33 +987,43 @@ class DTreeMasterProblem(BaseMasterProblem):
     def add_beta_cuts(self):
         assert self.generated_
         n_rows = self.X_.shape[0]
-        added_cuts = False
+        # added_cuts = False
+        infinity = self.solver_.infinity()
         num_cuts = 0
         for r in range(n_rows):
             if self.data_rows[r].removed_from_master:
                 continue
-            if num_cuts >= 1000:
+            if num_cuts >= 10:
                 break
             if self.added_row[r]:
                 continue
             satisfied_path_ids = self.get_satisfied_path_ids(r)
             if (self.violated_row_constraint(satisfied_path_ids)):
-
-                added_cuts = True
+                # added_cuts = True
                 num_cuts += 1
                 self.added_row[r] = True
                 self.row_cons_[r] = self.solver_.Constraint(
-                    1, 1, "row_"+str(r))
+                    -infinity, 1, "row_"+str(r))
                 for path_id in satisfied_path_ids:
                     xp_var = self.solver_.variable(path_id)
                     self.row_cons_[r].SetCoefficient(xp_var, 1)
-        return added_cuts
+        return num_cuts
+
+    def remove_gen_vars(self):
+        print("Removing the generated paths. Setting UB to 0.")
+        self.last_reset_iter_ = self.iter_
+        self.reset_timer_ = True
+        for path in self.paths_:
+            if not path.initial:
+                xp_var = self.solver_.variable(path.id)
+                xp_var.SetUb(0)
 
     def solve_rmp(self, solver_params=''):
         """TODO: Documentation.
         """
         assert self.generated_
         self.prev_rmp_objective_ = self.rmp_objective_
+        self.iter_ += 1
 
         self.rmp_result_status = self.solver_.Solve(
             get_params_from_string(solver_params))
@@ -998,33 +1033,40 @@ class DTreeMasterProblem(BaseMasterProblem):
         print('Number of constraints RMIP = %d' %
               self.solver_.NumConstraints())
         newly_added_cuts = []
-        for i in range(self.num_cuts_round):
-            if self.rmp_result_status == pywraplp.Solver.OPTIMAL:
-                self.store_lp_solution()
-                t_start = time()
-                cut_rows = []
-                added_beta_cuts = False
-                if self.beta_constraints_as_cuts:
-                    added_beta_cuts = self.add_beta_cuts()
-                if self.generate_cuts and not added_beta_cuts:
-                    cut_rows = self.add_cuts()
-                t_end = time()
-                # print("Added ", len(cut_rows), " cuts in ", t_end - t_start)
-                self.cut_gen_time += t_end - t_start
-                self.total_cuts_added += len(cut_rows)
-                print("Total cuts added: ", self.total_cuts_added)
-                print("Time spent in cut gen: ", self.cut_gen_time)
-                if (len(cut_rows) > 0):
-                    cuts_params = get_params_from_string(solver_params)
-                    cuts_params.SetIntegerParam(
-                        pywraplp.MPSolverParameters.LP_ALGORITHM,
-                        pywraplp.MPSolverParameters.DUAL)
-                    self.rmp_result_status = self.solver_.Solve(cuts_params)
-                    newly_added_cuts.extend(cut_rows)
+        if self.iter_ % 10 == 0:
+            for i in range(self.num_cuts_round):
+                if self.rmp_result_status == pywraplp.Solver.OPTIMAL:
+                    # print("Before cut iter ", i)
+                    # print(self.solver_.ExportModelAsLpFormat(False))
+                    self.store_lp_solution()
+                    t_start = time()
+                    cut_rows = []
+                    num_beta_cuts = 0
+                    if self.beta_constraints_as_cuts:
+                        num_beta_cuts = self.add_beta_cuts()
+                    if self.generate_cuts and num_beta_cuts == 0:
+                        cut_rows = self.add_cuts()
+                    t_end = time()
+                    self.cut_gen_time += t_end - t_start
+                    self.total_cuts_added += len(cut_rows) + num_beta_cuts
+                    print("Beta cuts added: ", num_beta_cuts)
+                    print("Total cuts added: ", self.total_cuts_added)
+                    print("Time spent in cut gen: ", self.cut_gen_time)
+                    if (len(cut_rows) > 0) or num_beta_cuts > 0:
+                        # Experiment: Cuts added. Remove the generated vars.
+                        # self.remove_gen_vars()
+                        cuts_params = get_params_from_string(solver_params)
+                        cuts_params.SetIntegerParam(
+                            pywraplp.MPSolverParameters.LP_ALGORITHM,
+                            pywraplp.MPSolverParameters.DUAL)
+                        self.rmp_result_status = self.solver_.Solve(
+                            cuts_params)
+                        if len(cut_rows) > 0:
+                            newly_added_cuts.extend(cut_rows)
+                    else:
+                        break
                 else:
                     break
-            else:
-                break
         leaf_duals = []
         row_duals = []
         cut_duals = []
@@ -1136,6 +1178,7 @@ class DTreeSubProblem(BaseSubproblem):
         self.yc_vars_ = None
         self.data_rows = data_rows
         self.cut_rows_starting_index = 0
+        self.iter_ = 0
 
     def create_submip(self, leaf_dual, row_duals, ns_duals, cut_duals):
         """TODO: Documentation.
@@ -1156,7 +1199,7 @@ class DTreeSubProblem(BaseSubproblem):
             if self.data_rows != None:
                 if self.data_rows[i].removed_from_sp:
                     continue
-                # obj_coeff = self.data_rows[i].weight
+                obj_coeff = self.data_rows[i].weight
             z_var = self.solver_.BoolVar('z_'+str(i))
             objective.SetCoefficient(z_var, obj_coeff)
             self.z_vars_[i] = z_var.index()
@@ -1206,16 +1249,16 @@ class DTreeSubProblem(BaseSubproblem):
                 one_feature.SetCoefficient(u_var, 1)
 
         # Each feature is selected at max once in a path
-        all_splits = list(dict.fromkeys(all_splits))
-        for split in all_splits:
-            unique_split = self.solver_.Constraint(
-                0, 1, "unique_split_" + str(split))
-            for node_id in nodes:
-                node = self.nodes_[node_id]
-                if split not in node.candidate_splits:
-                    continue
-                u_var = self.solver_.variable(self.u_vars_[node.id][split])
-                unique_split.SetCoefficient(u_var, 1)
+        # all_splits = list(dict.fromkeys(all_splits))
+        # for split in all_splits:
+        #     unique_split = self.solver_.Constraint(
+        #         0, 1, "unique_split_" + str(split))
+        #     for node_id in nodes:
+        #         node = self.nodes_[node_id]
+        #         if split not in node.candidate_splits:
+        #             continue
+        #         u_var = self.solver_.variable(self.u_vars_[node.id][split])
+        #         unique_split.SetCoefficient(u_var, 1)
 
         # Row follows correct path (upper and lower bound on y var)
         for i in range(n_rows):
@@ -1288,7 +1331,7 @@ class DTreeSubProblem(BaseSubproblem):
             if self.data_rows != None:
                 if self.data_rows[i].removed_from_sp:
                     continue
-                # obj_coeff = self.data_rows[i].weight
+                obj_coeff = self.data_rows[i].weight
             z_var = self.solver_.variable(self.z_vars_[i])
             objective.SetCoefficient(z_var, obj_coeff)
 
@@ -1331,6 +1374,7 @@ class DTreeSubProblem(BaseSubproblem):
             cut_index = i + self.cut_rows_starting_index
             yc_lb_cons = self.solver_.Constraint(
                 -infinity, self.tree_depth_-1, "cut_" + str(cut_index))
+            # yc_var is created in update_objective method.
             yc_var = self.solver_.variable(self.yc_vars_[cut_index])
             yc_lb_cons.SetCoefficient(yc_var, -1)
             for node_id in nodes:
@@ -1373,8 +1417,19 @@ class DTreeSubProblem(BaseSubproblem):
             # print(self.solver_.ExportModelAsLpFormat(False))
         assert has_solution, "Result status: " + str(result_status)
 
+        # if self.leaf_id_ == 4:
+        #     sp_mps = self.solver_.ExportModelAsMpsFormat(fixed_format=False,
+        #                                                  obfuscated=False)
+        #     name = "sp_" + str(self.tree_depth_) + "_" + \
+        #         str(self.iter_) + ".mps"
+        #     self.iter_ += 1
+        #     f = open(name, "w")
+        #     f.write(sp_mps)
+        #     f.close()
+
         # TODO: This threshold should be a parameter.
-        print("Subproblem objective = ", self.solver_.Objective().Value())
+        print("Subproblem ", self.leaf_id_, " objective = ",
+              self.solver_.Objective().Value())
         if self.solver_.Objective().Value() <= 1e-6:
             return []
 
@@ -1466,6 +1521,7 @@ class PathGenerator(cp_model.CpSolverSolutionCallback):
         self.orig_obj_coeffs = orig_obj_coeffs
         self.solution_count = 0
         self.paths = []
+        self.original_objective = 0.0
 
     def on_solution_callback(self):
         self.solution_count += 1
@@ -1499,6 +1555,7 @@ class PathGenerator(cp_model.CpSolverSolutionCallback):
 
         original_objective -= self.leaf_dual
 
+        self.original_objective = original_objective
         if original_objective <= 1e-6:
             return
 
@@ -1539,7 +1596,7 @@ class DTreeSubProblemSat(BaseSubproblem):
         self.targets_ = targets
         self.tree_depth_ = depth
         self.model_ = cp_model.CpModel()
-        self.objective_scale = 1000
+        self.objective_scale = 100000
         self.orig_obj_coeffs = {}
         self.generated_ = False
         self.z_vars_ = None
@@ -1595,7 +1652,7 @@ class DTreeSubProblemSat(BaseSubproblem):
                 yc_var = self.model_.NewBoolVar('yc_'+str(i))
                 self.orig_obj_coeffs[yc_var] = -cut_duals[i]
                 yc_coeff = self.scale_obj_coeff(-cut_duals[i])
-                self.yc_vars_.append(yc_var)
+                self.yc_vars_[i] = yc_var
                 # obj += cp_model.LinearExpr.Term(yc_var, yc_coeff)
                 obj_vars.append(yc_var)
                 obj_coeffs.append(yc_coeff)
@@ -1702,6 +1759,7 @@ class DTreeSubProblemSat(BaseSubproblem):
         """
         assert self.generated_, "Called update_objective before generating SP"
         # obj = cp_model.LinearExpr()
+        # TODO: This method is slow. Make it faster.
         obj_vars = []
         obj_coeffs = []
 
@@ -1730,7 +1788,6 @@ class DTreeSubProblemSat(BaseSubproblem):
 
         num_cuts = len(cut_duals)
         existing_cuts = len(self.yc_vars_)
-        self.yc_vars_ = [None]*num_cuts
         if num_cuts > 0:
             for i in range(num_cuts):
                 yc_var = None
@@ -1794,13 +1851,15 @@ class DTreeSubProblemSat(BaseSubproblem):
         self.cut_rows_starting_index += n_cut_rows
 
     def update_subproblem(self, X, y, dual_costs):
+        cut_rows = dual_costs[4]
+        if len(cut_rows) == 0:
+            return
         self.X_ = X
         self.y_ = y
         leaf_dual = dual_costs[0][self.leaf_id_]
         row_duals = dual_costs[1]
         ns_duals = dual_costs[2]
         cut_duals = dual_costs[3]
-        cut_rows = dual_costs[4]
 
         if self.generated_:
             self.update_objective(leaf_dual, row_duals, ns_duals, cut_duals)
@@ -1822,6 +1881,16 @@ class DTreeSubProblemSat(BaseSubproblem):
     def generate_columns(self, X, y, dual_costs, params=""):
         """TODO: Documentation.
         """
+        self.X_ = X
+        self.y_ = y
+        leaf_dual = dual_costs[0][self.leaf_id_]
+        row_duals = dual_costs[1]
+        ns_duals = dual_costs[2]
+        cut_duals = dual_costs[3]
+        if self.generated_:
+            self.update_objective(leaf_dual, row_duals, ns_duals, cut_duals)
+        else:
+            self.create_submip(leaf_dual, row_duals, ns_duals, cut_duals)
 
         # Solve sub problem
         sp_solver = cp_model.CpSolver()
@@ -1836,8 +1905,10 @@ class DTreeSubProblemSat(BaseSubproblem):
                                        self.nodes_,
                                        self.orig_obj_coeffs)
         status = sp_solver.Solve(self.model_, path_generator)
-        print("Path generation status: ", sp_solver.StatusName(status))
-        print("Path generation objective: ", sp_solver.ObjectiveValue())
+        # print(self.leaf_id_, " Path generation status: ",
+        #       sp_solver.StatusName(status))
+        print(self.leaf_id_, " Path generation objective: ",
+              path_generator.original_objective)
         paths = path_generator.paths
         return paths
 
@@ -1863,7 +1934,7 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
         # Generate random columns and return the ones with postive reduced
         # cost.
         generated_paths = []
-        return generated_paths
+        # return generated_paths
         for iter in range(100):
             path = Path()
             # Pick a leaf
@@ -1905,7 +1976,7 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
                 row_satisfies_path_array[row] = True
                 row_weight = 1
                 if self.data_rows != None:
-                    # row_weight = self.data_rows[row].weight
+                    row_weight = self.data_rows[row].weight
                     if self.data_rows[row].removed_from_sp:
                         continue
 
@@ -1992,6 +2063,305 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
         return reduced_cost
 
 
+class DTreeSubProblemOld(BaseSubproblem):
+    """TODO: Documentation."""
+
+    def __init__(self, leaf, nodes, splits, target,
+                 depth, data_rows=None,
+                 optimization_problem_type='sat') -> None:
+        super().__init__()
+        self.leaf_id_ = leaf.id
+        self.leaf_ = leaf
+        self.nodes_ = nodes
+        self.splits_ = splits
+        self.target_ = target
+        self.tree_depth_ = depth
+        self.solver_ = pywraplp.Solver.CreateSolver(optimization_problem_type)
+        self.generated_ = False
+        self.yc_vars_ = None
+        self.data_rows = data_rows
+        self.cut_rows_starting_index = 0
+        self.iter_ = 0
+
+    def create_submip(self, leaf_dual, row_duals, ns_duals, cut_duals):
+        """TODO: Documentation.
+        """
+        assert not self.generated_, "SP is already created."
+        infinity = self.solver_.infinity()
+        self.solver_.SetNumThreads(7)
+
+        n_rows = self.X_.shape[0]
+        # Binary variables indicating that row reaches the leaf.
+        self.y_vars_ = [None]*n_rows
+        objective = self.solver_.Objective()
+        for i in range(n_rows):
+            obj_coeff = 1
+            if self.data_rows != None:
+                if self.data_rows[i].removed_from_sp:
+                    continue
+                obj_coeff = self.data_rows[i].weight
+
+            y_var = self.solver_.BoolVar('y_'+str(i))
+            row_dual = row_duals[i]
+            if self.y_[i] == self.target_:
+                objective.SetCoefficient(y_var, 1-row_dual)
+            else:
+                objective.SetCoefficient(y_var, -row_dual)
+            self.y_vars_[i] = y_var.index()
+
+        num_cuts = len(cut_duals)
+        self.yc_vars_ = [None]*num_cuts
+        if num_cuts > 0:
+            for i in range(num_cuts):
+                yc_var = self.solver_.BoolVar('yc_'+str(i))
+                cut_dual = cut_duals[i]
+                objective.SetCoefficient(yc_var, -cut_dual)
+                self.yc_vars_[i] = yc_var.index()
+
+        # Binary variables u_j_a indicating that split s is assigned to the
+        # node j.
+        self.u_vars_ = {}
+        self.leaf_
+        nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
+        all_splits = []
+        for node_id in nodes:
+            node = self.nodes_[node_id]
+            self.u_vars_[node.id] = {}
+            for split in node.candidate_splits:
+                all_splits.append(split)
+                u_var = self.solver_.BoolVar(
+                    'u_'+str(node.id)+'_'+str(split))
+                ns_dual = ns_duals[self.leaf_id_][node.id][split]
+                objective.SetCoefficient(u_var, -ns_dual)
+                self.u_vars_[node.id][split] = u_var.index()
+
+        objective.SetOffset(-leaf_dual)
+        objective.SetMaximization()
+
+        # Constraints
+        # For each node, exactly one feature is selected
+        for node_id in nodes:
+            node = self.nodes_[node_id]
+            one_feature = self.solver_.Constraint(
+                1, 1, "one_feature_" + str(node.id))
+            for split in node.candidate_splits:
+                u_var = self.solver_.variable(self.u_vars_[node.id][split])
+                one_feature.SetCoefficient(u_var, 1)
+
+        # Each feature is selected at max once in a path
+        # all_splits = list(dict.fromkeys(all_splits))
+        # for split in all_splits:
+        #     unique_split = self.solver_.Constraint(
+        #         0, 1, "unique_split_" + str(split))
+        #     for node_id in nodes:
+        #         node = self.nodes_[node_id]
+        #         if split not in node.candidate_splits:
+        #             continue
+        #         u_var = self.solver_.variable(self.u_vars_[node.id][split])
+        #         unique_split.SetCoefficient(u_var, 1)
+
+        # Row follows correct path (upper and lower bound on y var)
+        for i in range(n_rows):
+            if self.data_rows != None:
+                if self.data_rows[i].removed_from_sp:
+                    continue
+            y_lb_cons = self.solver_.Constraint(
+                -infinity, self.tree_depth_-1, "row_" + str(i))
+            y_var = self.solver_.variable(self.y_vars_[i])
+            y_lb_cons.SetCoefficient(y_var, -1)
+            for node_id in nodes:
+                node = self.nodes_[node_id]
+                rn_cons = self.solver_.Constraint(
+                    -infinity, 0, "rn_" + str(i) + '_' + str(node.id))
+
+                rn_cons.SetCoefficient(y_var, 1)
+                if node.id in self.leaf_.left_nodes:
+                    for split in node.candidate_splits:
+                        if self.row_satisfies_split(i, self.splits_[split]):
+                            u_var = self.solver_.variable(
+                                self.u_vars_[node.id][split])
+                            rn_cons.SetCoefficient(u_var, -1)
+                            y_lb_cons.SetCoefficient(u_var, 1)
+                elif node.id in self.leaf_.right_nodes:
+                    for split in node.candidate_splits:
+                        if not self.row_satisfies_split(i,
+                                                        self.splits_[split]):
+                            u_var = self.solver_.variable(
+                                self.u_vars_[node.id][split])
+                            rn_cons.SetCoefficient(u_var, -1)
+                            y_lb_cons.SetCoefficient(u_var, 1)
+
+        self.generated_ = True
+
+    def update_objective(self, leaf_dual, row_duals, ns_duals, cut_duals):
+        """TODO: Documentation.
+        """
+        objective = self.solver_.Objective()
+        n_rows = self.X_.shape[0]
+        for i in range(n_rows):
+            obj_coeff = 1
+            if self.data_rows != None:
+                if self.data_rows[i].removed_from_sp:
+                    continue
+                # obj_coeff = self.data_rows[i].weight
+
+            y_var = self.solver_.variable(self.y_vars_[i])
+            row_dual = row_duals[i]
+            if self.y_[i] == self.target_:
+                objective.SetCoefficient(y_var, 1-row_dual)
+            else:
+                objective.SetCoefficient(y_var, -row_dual)
+
+        num_cuts = len(cut_duals)
+        existing_cuts = len(self.yc_vars_)
+        if num_cuts > 0:
+            for i in range(num_cuts):
+                yc_var = None
+                if i >= existing_cuts:
+                    yc_var = self.solver_.BoolVar('yc_'+str(i))
+                    self.yc_vars_.append(yc_var.index())
+                else:
+                    yc_var = self.solver_.variable(self.yc_vars_[i])
+                cut_dual = cut_duals[i]
+                objective.SetCoefficient(yc_var, -cut_dual)
+
+        nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
+        for node_id in nodes:
+            node = self.nodes_[node_id]
+            for split in node.candidate_splits:
+                u_var = self.solver_.variable(self.u_vars_[node.id][split])
+                ns_dual = ns_duals[self.leaf_id_][node.id][split]
+                objective.SetCoefficient(u_var, -ns_dual)
+
+        objective.SetOffset(-leaf_dual)
+        objective.SetMaximization()
+        return
+
+    def add_cut_rows(self, cut_rows):
+        assert self.generated_
+        infinity = self.solver_.infinity()
+        nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
+        n_cut_rows = len(cut_rows)
+        # Row follows correct path (upper and lower bound on y var)
+        for i in range(n_cut_rows):
+            cut_index = i + self.cut_rows_starting_index
+            yc_lb_cons = self.solver_.Constraint(
+                -infinity, self.tree_depth_-1, "cut_" + str(cut_index))
+            # yc_var is created in update_objective method.
+            yc_var = self.solver_.variable(self.yc_vars_[cut_index])
+            yc_lb_cons.SetCoefficient(yc_var, -1)
+            for node_id in nodes:
+                node = self.nodes_[node_id]
+                cn_cons = self.solver_.Constraint(
+                    -infinity, 0, "cn_" + str(cut_index) + '_' + str(node.id))
+
+                cn_cons.SetCoefficient(yc_var, 1)
+                if node.id in self.leaf_.left_nodes:
+                    for split in node.candidate_splits:
+                        if cut_rows[i][split]:
+                            u_var = self.solver_.variable(
+                                self.u_vars_[node.id][split])
+                            cn_cons.SetCoefficient(u_var, -1)
+                            yc_lb_cons.SetCoefficient(u_var, 1)
+                elif node.id in self.leaf_.right_nodes:
+                    for split in node.candidate_splits:
+                        if not cut_rows[i][split]:
+                            u_var = self.solver_.variable(
+                                self.u_vars_[node.id][split])
+                            cn_cons.SetCoefficient(u_var, -1)
+                            yc_lb_cons.SetCoefficient(u_var, 1)
+        self.cut_rows_starting_index += n_cut_rows
+
+    def generate_columns(self, X, y, dual_costs, params=""):
+        """TODO: Documentation.
+        """
+
+        # Solve sub problem
+        result_status = self.solver_.Solve(get_params_from_string(params))
+
+        has_solution = (result_status == pywraplp.Solver.OPTIMAL or
+                        result_status == pywraplp.Solver.FEASIBLE)
+
+        # The current path is always feasible.
+        # # TODO: Fix this. Sat solver returns infeasible sometimes
+        # (even without cuts).
+        if not has_solution:
+            return []
+            # print(self.solver_.ExportModelAsLpFormat(False))
+        assert has_solution, "Result status: " + str(result_status)
+
+        # if self.leaf_id_ == 4:
+        #     sp_mps = self.solver_.ExportModelAsMpsFormat(fixed_format=False,
+        #                                                  obfuscated=False)
+        #     name = "sp_" + str(self.tree_depth_) + "_" + \
+        #         str(self.iter_) + ".mps"
+        #     self.iter_ += 1
+        #     f = open(name, "w")
+        #     f.write(sp_mps)
+        #     f.close()
+
+        # TODO: This threshold should be a parameter.
+        print("Subproblem ", self.leaf_id_, " objective = ",
+              self.solver_.Objective().Value())
+        if self.solver_.Objective().Value() <= 1e-6:
+            return []
+
+        nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
+        path = Path()
+        path.leaf_id = self.leaf_id_
+        path.node_ids = []
+        path.splits = []
+        path.cost = 0
+        path.id = -1
+        for node in self.nodes_:
+            if node.id not in nodes:
+                continue
+            path.node_ids.append(node.id)
+            for split in node.candidate_splits:
+                u_var = self.solver_.variable(self.u_vars_[node.id][split])
+                if u_var.solution_value() > 0.5:
+                    path.splits.append(split)
+                    break
+        path.target = self.target_
+        n_rows = self.X_.shape[0]
+        for i in range(n_rows):
+            obj_coeff = 1
+            if self.data_rows != None:
+                if self.data_rows[i].removed_from_sp:
+                    continue
+                # obj_coeff = self.data_rows[i].weight
+            y_var = self.solver_.variable(self.y_vars_[i])
+            if self.y_[i] == self.target_:
+                path.cost += 1 * y_var.solution_value()
+        return [path]
+
+    def update_subproblem(self, X, y, dual_costs):
+        self.X_ = X
+        self.y_ = y
+        leaf_dual = dual_costs[0][self.leaf_id_]
+        row_duals = dual_costs[1]
+        ns_duals = dual_costs[2]
+        cut_duals = dual_costs[3]
+        cut_rows = dual_costs[4]
+
+        if self.generated_:
+            self.update_objective(leaf_dual, row_duals, ns_duals, cut_duals)
+        else:
+            self.create_submip(leaf_dual, row_duals, ns_duals, cut_duals)
+
+        if len(cut_rows) > 0:
+            self.add_cut_rows(cut_rows)
+
+    def row_satisfies_split(self, row, split):
+        """TODO: Documentation.
+        """
+        feature = split.feature
+        threshold = split.threshold
+        if self.X_[row, feature] <= threshold:
+            return True
+        return False
+
+
 class DTreeClassifier(ColGenClassifier):
     """TODO: Documentation.
     """
@@ -2005,6 +2375,8 @@ class DTreeClassifier(ColGenClassifier):
                  master_generate_cuts=False,
                  data_rows=None,
                  rmp_is_ip=True,
+                 use_old_sp=False,
+                 master_solver_type='glop',
                  rmp_solver_params="",
                  master_ip_solver_params="", subproblem_params=""):
 
@@ -2039,11 +2411,12 @@ class DTreeClassifier(ColGenClassifier):
             leaf_id += 1
         # Each path can only contain nodes and leaves provided.
         for path in self.initial_paths:
+            path.initial = True
             assert path.leaf_id in leaf_ids
             for node_id in path.node_ids:
                 assert node_id in node_ids
             for split_id in path.splits:
-                assert split_id in split_ids
+                assert split_id in split_ids, "split id " + str(split_id)
             assert path.target in targets
             assert len(path.node_ids) == self.tree_depth
             assert len(path.splits) == self.tree_depth
@@ -2053,6 +2426,7 @@ class DTreeClassifier(ColGenClassifier):
             num_cuts_round=num_master_cuts_round,
             beta_constraints_as_cuts=master_beta_constraints_as_cuts,
             generate_cuts=master_generate_cuts,
+            solver_type=master_solver_type,
             data_rows=data_rows)
         self.subproblems = []
         all_subproblem_params = []
@@ -2064,16 +2438,26 @@ class DTreeClassifier(ColGenClassifier):
         self.subproblems.append([])
         all_subproblem_params.append([])
         for leaf in self.leaves:
-            # subproblem = DTreeSubProblem(
-            #     leaf, self.nodes, self.splits, self.targets,
-            #     self.tree_depth, optimization_problem_type='sat',
-            #     data_rows=data_rows)
-            subproblem = DTreeSubProblemSat(
-                leaf, self.nodes, self.splits, self.targets,
-                self.tree_depth,
-                data_rows=data_rows)
-            self.subproblems[1].append(subproblem)
-            all_subproblem_params[1].append(subproblem_params)
+            if use_old_sp:
+                for target in self.targets:
+                    subproblem = DTreeSubProblemOld(
+                        leaf, self.nodes, self.splits, target,
+                        self.tree_depth, optimization_problem_type='sat',
+                        data_rows=data_rows)
+                    self.subproblems[1].append(subproblem)
+                    all_subproblem_params[1].append(subproblem_params)
+            else:
+                # subproblem = DTreeSubProblem(
+                #     leaf, self.nodes, self.splits, self.targets,
+                #     self.tree_depth, optimization_problem_type='sat',
+                #     data_rows=data_rows)
+                subproblem = DTreeSubProblemSat(
+                    leaf, self.nodes, self.splits, self.targets,
+                    self.tree_depth,
+                    data_rows=data_rows)
+                self.subproblems[1].append(subproblem)
+                all_subproblem_params[1].append(subproblem_params)
+
         super().__init__(max_iterations, time_limit,
                          self.master_problem, self.subproblems,
                          rmp_is_ip, rmp_solver_params, master_ip_solver_params,
