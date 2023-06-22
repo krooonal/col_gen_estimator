@@ -214,31 +214,43 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         self.time_limit_reached_ = False
         self.num_col_added_sp_ = []
         self.time_spent_sp_ = []
+        self.time_add_col_ = 0.0
         self.time_spent_master_ = 0.0
         for level in range(len(self.subproblems)):
             self.num_col_added_sp_.append([0]*len(self.subproblems[level]))
             self.time_spent_sp_.append([0.0]*len(self.subproblems[level]))
 
-        iter = 0
+        self.iter_ = 0
         while True:
-            if self.max_iterations > 0 and iter >= self.max_iterations:
+            if self.max_iterations > 0 and self.iter_ >= self.max_iterations:
                 break
-            iter += 1
-            print("Iteration number: ", iter)
-            self.performed_iter_ += 1
+            self.iter_ += 1
+            print("Iteration number: ", self.iter_)
+            print("Time elapsed: ", time() - t_start)
             master_time_start = time()
             dual_costs = self.master_problem.solve_rmp(self.rmp_solver_params)
             self.time_spent_master_ += time() - master_time_start
             if self.master_problem.rmp_objective_improved():
                 self.num_improving_iter_ += 1
 
+            # TODO:Remove this.
+            if hasattr(self.master_problem, 'reset_timer_'):
+                if self.master_problem.reset_timer_:
+                    t_start = time()
+                    self.master_problem.reset_timer_ = False
+                    print("Reset timer.")
+
             rmp_updated = False
             # Update the subproblems
             for sp_level in range(len(self.subproblems)):
                 for sp_ind in range(len(self.subproblems[sp_level])):
+                    sp_time_start = time()
                     self.subproblems[sp_level][sp_ind] \
                         .update_subproblem(
                             X, self.processed_y_, dual_costs)
+                    sp_time_end = time()
+                    self.time_spent_sp_[
+                        sp_level][sp_ind] += sp_time_end - sp_time_start
 
             for sp_level in range(len(self.subproblems)):
                 # TODO: do this in parallel.
@@ -254,14 +266,16 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
                         X, self.processed_y_, dual_costs,
                         self.subproblem_params[sp_level][sp_ind])
                     sp_time_end = time()
+                    self.time_spent_sp_[
+                        sp_level][sp_ind] += sp_time_end - sp_time_start
 
+                    col_add_start = time()
                     for column in generated_columns:
                         col_added = self.master_problem.add_column(column)
                         self.num_col_added_sp_[
                             sp_level][sp_ind] += 1 if col_added else 0
-                        self.time_spent_sp_[
-                            sp_level][sp_ind] += sp_time_end - sp_time_start
                         rmp_updated = rmp_updated or col_added
+                    self.time_add_col_ += time() - col_add_start
                     if rmp_updated:
                         break
                 self.time_elapsed_ = time() - t_start
@@ -277,8 +291,11 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
                     self.mp_optimal_ = True
                 break
 
+        self.time_spent_master_ip_ = 0.0
         if self.rmp_is_ip:
+            master_ip_start_time = time()
             solved = self.master_problem.solve_ip(self.master_ip_solver_params)
+            self.time_spent_master_ip_ += time() - master_ip_start_time
             assert solved, "RMP integer program couldn't be solved."
 
         self.is_fitted_ = True
