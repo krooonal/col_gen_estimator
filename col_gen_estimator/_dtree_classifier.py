@@ -181,7 +181,6 @@ class Path:
     cost: (int) Number of rows following the path with correct target.
     id: (int) ID of the path.
     target: (int) Associated target of the path.
-    initial: (bool) True if the path is used for initializing the RMP.
     """
 
     def __init__(self) -> None:
@@ -307,7 +306,7 @@ class Leaf:
 
     def create_leaf(self, id, depth) -> None:
         """Given the id and depth of the leaf, populates the left_nodes and
-        right_nodes attributes. Used for tests only.
+        right_nodes attributes.
         Parameters
         ----------
         id: (int) ID of the leaf.
@@ -493,17 +492,13 @@ class CutGenerator(cp_model.CpSolverSolutionCallback):
         # path_vars are updated after each col gen iter.
         self.path_vars = path_vars
         self.split_vars = split_vars
-        self.solution_count_ = 0
+        self.solution_count = 0
         self.cuts_ = []
         self.cut_rows = []
         self.orig_path_coeffs = orig_path_coeffs
 
     def on_solution_callback(self):
-        """Called for each solution. If the solution is a violated cut,
-        then this method adds the corresponding information in the cuts_ and
-        cut_rows.
-        """
-        self.solution_count_ += 1
+        self.solution_count += 1
         orig_obj = 0.0
         cut = [False] * len(self.path_vars)
         cut_row = [False] * len(self.split_vars)
@@ -521,56 +516,14 @@ class CutGenerator(cp_model.CpSolverSolutionCallback):
             self.cut_rows.append(cut_row)
 
     def solution_count(self):
-        return self.solution_count_
+        return self.solution_count
 
     def cuts(self):
         return (self.cuts_, self.cut_rows)
 
 
 class DTreeMasterProblem(BaseMasterProblem):
-    """The master problem for training decision trees. This extends the 
-    BaseMasterProblem for column generation classifier.
-
-    Parameters
-    ----------
-    initial_paths: list(Path), Paths used for initializing the RMP.
-    leaves: list(Leaf), Leaves of the tree.
-    nodes: list(Node), Nodes of the tree.
-    splits: list(Split), Set of all split checks.
-    beta_constraints_as_cuts: bool, default=False,
-        If true, the beta constraints in the RMP are used as cutting planes.
-        They will only be added if the LP solution violates them.
-    generate_cuts: bool, default=False,
-        If true, the model also tries to generate beta cuts that are not
-        present in the dataset.
-    num_cuts_round: int, default=0,
-        The number of cut generating rounds per iteration. Note that the cuts
-        are generated once for every 10 iterations.
-    solver_type: string, default='glop',
-        Describes the solver used for solving the master problem. Use 'glop'
-        for testing.
-    data_rows: list(Row), preprocessed training rows information.
-
-    Attributes
-    ----------
-    solver_: MPSolver from OR-Tools,
-        The solver used for solving the master problem.
-    cut_gen_model_: CpModel from OR-Tools,
-        The solver used for generating beta cuts.
-    cut_obj_scale: int, The objective for cut generation model is scaled by
-        this number since the CpModel can only use integer objective 
-        coefficients.
-    generated_: boolean,
-        True when the master problem model has been generated. False otherwise.
-    paths_: list(Path), Initial_paths
-    generated_paths: set(Path),
-        Set of all paths that are generated using column generation.
-    total_cuts_added: int, Count of total cuts added.
-    cut_gen_time: float, Time spent in generating cuts.
-    rmp_objective_: float, The RMP objective value from last solved LP.
-    iter_: int, The iteration number.
-    last_reset_iter_: int, Experimental. Not used.
-    reset_timer_: bool, Experimental. Not used.
+    """TODO: Documentation.
     """
 
     def __init__(self, initial_paths, leaves, nodes, splits,
@@ -657,7 +610,7 @@ class DTreeMasterProblem(BaseMasterProblem):
                         split_j_var, split_i_var)
 
     def generate_mp(self, X, y):
-        """Generates the master problem.
+        """TODO: Documentation.
         """
         if self.generated_:
             return
@@ -724,11 +677,14 @@ class DTreeMasterProblem(BaseMasterProblem):
                 node = self.nodes_[node_id]
                 self.ns_constraints_[leaf.id][node.id] = {}
                 for split in node.candidate_splits:
+
                     ns_var_ind = self.ns_vars[(node.id, split)] \
                         if (node.id, split) in self.ns_vars \
                         else self.solver_.IntVar(0.0, infinity, "r_ns_" +
                                                  str(node.id) +
                                                  "_"+str(split)).index()
+                    # else self.solver_.BoolVar("r_ns_" + str(node.id) +
+                    #                           "_"+str(split)).index()
                     self.ns_vars[(node.id, split)] = ns_var_ind
 
                     ns_var = self.solver_.variable(ns_var_ind)
@@ -761,30 +717,14 @@ class DTreeMasterProblem(BaseMasterProblem):
             self.path_solution_values[xp_var_id] = xp_var.solution_value()
 
     def compute_satisfied_paths(self):
-        """For each row in the dataset, compute the set of paths it can follow.
-        """
         for r, data_row in enumerate(self.data_rows):
             for path in self.paths_:
                 if row_satisfies_path(self.X_[r], self.leaves_[path.leaf_id],
                                       self.splits_, path):
                     data_row.reachable_paths.add(path.id)
 
-    def preprocess_rows(self, aggressive=False, time_limit=150):
-        """Basic preprocessing of rows. Compute the set of reachable nodes,
-        reachable leaves, and reachable paths for each row. If the row can
-        only reach at max 2 leaves, remove it from the master.
-
-        Parameters
-        ----------
-        aggressive: bool, default=False,
-            If true, this method compares each pair of row till the time limit
-            is reached. If two rows are similar in terms of branches taken on
-            reachable nodes split checks, it removes one of them and increases
-            the weight of the other by 1.
-        time_limit: int, default=150
-            Time limit in seconds.
-        """
-        t_start = time()
+    def preprocess_rows(self, aggressive=False):
+        """TODO: Documentation."""
         # preprocess nodes first
         n_leaves = len(self.leaves_)
         depth = int(math.log2(n_leaves))
@@ -801,17 +741,24 @@ class DTreeMasterProblem(BaseMasterProblem):
                 node.right_child -= (2**(depth) - 1)
                 node.children_are_leaves = True
 
+            # print(node.id, node.parent, node.left_child,
+            #       node.right_child, node.children_are_leaves)
+
+        # print("Splits:")
+        # for split in self.splits_:
+        #     feature = split.feature
+        #     threshold = split.threshold
+        #     print(split.id, feature, threshold)
         data_rows = []
         n_rows = self.X_.shape[0]
-        removed_count_master = 0
-        removed_count_sp = 0
+        removed_count = 0
         average_leaf_reach = 0.0
         for r in range(n_rows):
             data_row = Row()
-            data_row.target = self.y_[r]
-            # TODO: Double computation.
             for split in self.splits_:
-                if r in split.left_rows:
+                feature = split.feature
+                threshold = split.threshold
+                if self.X_[r, feature] <= threshold:
                     data_row.left_splits.add(split.id)
                 else:
                     data_row.right_splits.add(split.id)
@@ -836,14 +783,25 @@ class DTreeMasterProblem(BaseMasterProblem):
                                     node.right_child)
 
             average_leaf_reach += len(data_row.reachable_leaves)
-            # EXP: Enable/Disable preprocessing.
+            # print(r, data_row.reachable_leaves)
             if len(data_row.reachable_leaves) <= 2:
+                # print("Row reaches fewer leaves: ",
+                #       r, data_row.reachable_leaves)
+                # print(data_row.left_splits)
+                # print(data_row.reachable_nodes)
+                # print(self.X_[r])
                 data_row.removed_from_master = True
-                removed_count_master += 1
+                removed_count += 1
+
+            # Record which paths it can follow.
+            for path in self.paths_:
+                if row_satisfies_path(self.X_[r], self.leaves_[path.leaf_id],
+                                      self.splits_, path):
+                    data_row.reachable_paths.add(path.id)
 
             data_rows.append(data_row)
 
-        print("Fewer leaves removed rows: ", removed_count_master)
+        print("Fewer leaves removed rows: ", removed_count)
         average_leaf_reach /= n_rows
         print("Average leaf reach: ", average_leaf_reach)
 
@@ -851,14 +809,10 @@ class DTreeMasterProblem(BaseMasterProblem):
         if not aggressive:
             return data_rows
         for r1 in range(n_rows):
-            if time_limit > 0 and time()-t_start > time_limit:
-                break
-            if data_rows[r1].removed_from_sp:
+            if data_rows[r1].removed_from_master:
                 continue
             for r2 in range(r1+1, n_rows):
-                if time_limit > 0 and time()-t_start > time_limit:
-                    break
-                if data_rows[r2].removed_from_sp:
+                if data_rows[r2].removed_from_master:
                     continue
 
                 if data_rows[r1].reachable_nodes != \
@@ -880,23 +834,20 @@ class DTreeMasterProblem(BaseMasterProblem):
                         break
 
                 if not found_mismatch_split:
-                    if not data_rows[r1].removed_from_master:
-                        data_rows[r2].removed_from_master = True
-                        removed_count_master += 1
-                    if y[r1] == y[r2]:
-                        data_rows[r2].removed_from_sp = True
-                        removed_count_sp += 1
-                        data_rows[r1].weight += 1
-
+                    data_rows[r2].removed_from_master = True
+                    removed_count += 1
                     # print("Rows are similar: ", r1, r2)
 
-        print("Total removed rows master: ", removed_count_master)
-        print("Total removed rows sp: ", removed_count_sp)
+                # if data_rows[r1].left_splits == data_rows[r2].left_splits:
+                #     data_rows[r2].removed_from_master = True
+                #     removed_count += 1
+                #     print("Rows are similar: ", r1, r2)
+
+        print("Total removed rows: ", removed_count)
         return data_rows
 
     def add_column(self, path):
-        """Adds the column for the given path to the RMP. Also updates the cut
-        generation model.
+        """TODO: Documentation.
         """
         # print("Adding path")
         # path.print_path()
@@ -971,8 +922,6 @@ class DTreeMasterProblem(BaseMasterProblem):
         return True
 
     def add_cuts(self):
-        """Attempts to generate cuts using the current LP solution and adds 
-        generated cuts to the RMP."""
         # Create the objective for the cut generation model
         path_coeffs = []
         orig_path_coeffs = []
@@ -1023,12 +972,11 @@ class DTreeMasterProblem(BaseMasterProblem):
         return cut_rows
 
     def get_satisfied_path_ids(self, row):
-        """Returns the list of satisfied path ids for the given row."""
+        """TODO: Documentation."""
         return list(self.data_rows[row].reachable_paths)
 
     def violated_row_constraint(self, satisfied_path_ids):
-        """Helper method. Returns true if the current LP solution violates the
-        beta constraints containing the 'satisfied_path_ids' paths."""
+        """TODO: Documentation."""
         path_sum = 0.0
         for path_id in satisfied_path_ids:
             path_sum += self.path_solution_values[path_id]
@@ -1037,8 +985,6 @@ class DTreeMasterProblem(BaseMasterProblem):
         return False
 
     def add_beta_cuts(self):
-        """Checks for violated beta constraints by the LP solution that are
-        not yet added to the RMP."""
         assert self.generated_
         n_rows = self.X_.shape[0]
         # added_cuts = False
@@ -1064,7 +1010,6 @@ class DTreeMasterProblem(BaseMasterProblem):
         return num_cuts
 
     def remove_gen_vars(self):
-        """Experimental. Not used."""
         print("Removing the generated paths. Setting UB to 0.")
         self.last_reset_iter_ = self.iter_
         self.reset_timer_ = True
@@ -1074,8 +1019,7 @@ class DTreeMasterProblem(BaseMasterProblem):
                 xp_var.SetUb(0)
 
     def solve_rmp(self, solver_params=''):
-        """Solves the RMP. Returns the dual values for constraints and details
-        for generated cuts if any.
+        """TODO: Documentation.
         """
         assert self.generated_
         self.prev_rmp_objective_ = self.rmp_objective_
@@ -1092,6 +1036,8 @@ class DTreeMasterProblem(BaseMasterProblem):
         if self.iter_ % 10 == 0:
             for i in range(self.num_cuts_round):
                 if self.rmp_result_status == pywraplp.Solver.OPTIMAL:
+                    # print("Before cut iter ", i)
+                    # print(self.solver_.ExportModelAsLpFormat(False))
                     self.store_lp_solution()
                     t_start = time()
                     cut_rows = []
@@ -1164,8 +1110,6 @@ class DTreeMasterProblem(BaseMasterProblem):
         return (leaf_duals, row_duals, ns_duals, cut_duals, newly_added_cuts)
 
     def rmp_objective_improved(self):
-        """Returns true if the RMP objective value has improved compared to the
-        last iteration."""
         if self.rmp_result_status == pywraplp.Solver.OPTIMAL:
             return self.prev_rmp_objective_ < self.rmp_objective_
         else:
@@ -1216,8 +1160,7 @@ class DTreeMasterProblem(BaseMasterProblem):
 
 
 class DTreeSubProblem(BaseSubproblem):
-    """The  subproblem for training decision trees. 
-    This extends the BaseSubproblem for column generation classifier."""
+    """TODO: Documentation."""
 
     def __init__(self, leaf, nodes, splits, targets,
                  depth, data_rows=None,
@@ -1238,7 +1181,7 @@ class DTreeSubProblem(BaseSubproblem):
         self.iter_ = 0
 
     def create_submip(self, leaf_dual, row_duals, ns_duals, cut_duals):
-        """Creates the subproblem integer model using the given dual values.
+        """TODO: Documentation.
         """
         assert not self.generated_, "SP is already created."
         infinity = self.solver_.infinity()
@@ -1379,8 +1322,7 @@ class DTreeSubProblem(BaseSubproblem):
         self.generated_ = True
 
     def update_objective(self, leaf_dual, row_duals, ns_duals, cut_duals):
-        """Updates the objective of the existing subproblem for the given 
-        duals.
+        """TODO: Documentation.
         """
         objective = self.solver_.Objective()
         n_rows = self.X_.shape[0]
@@ -1423,7 +1365,6 @@ class DTreeSubProblem(BaseSubproblem):
         return
 
     def add_cut_rows(self, cut_rows):
-        """Adds the generated cut rows to the subproblem model."""
         assert self.generated_
         infinity = self.solver_.infinity()
         nodes = self.leaf_.left_nodes + self.leaf_.right_nodes
@@ -1459,7 +1400,7 @@ class DTreeSubProblem(BaseSubproblem):
         self.cut_rows_starting_index += n_cut_rows
 
     def generate_columns(self, X, y, dual_costs, params=""):
-        """Solves the subproblem integer program and returns generated paths.
+        """TODO: Documentation.
         """
 
         # Solve sub problem
@@ -1528,7 +1469,6 @@ class DTreeSubProblem(BaseSubproblem):
         return [path]
 
     def update_subproblem(self, X, y, dual_costs):
-        """Creates or updates the subproblem for the given duals."""
         self.X_ = X
         self.y_ = y
         leaf_dual = dual_costs[0][self.leaf_id_]
@@ -1546,7 +1486,7 @@ class DTreeSubProblem(BaseSubproblem):
             self.add_cut_rows(cut_rows)
 
     def row_satisfies_split(self, row, split):
-        """Returns true if the row satisfies the split check condition.
+        """TODO: Documentation.
         """
         feature = split.feature
         threshold = split.threshold
@@ -1557,6 +1497,9 @@ class DTreeSubProblem(BaseSubproblem):
 
 class PathGenerator(cp_model.CpSolverSolutionCallback):
     """Track intermediate solutions of sp.
+    Attributes
+    ----------
+    TODO
     """
 
     def __init__(self, u_vars, w_vars, z_vars, y_vars,
@@ -1641,8 +1584,7 @@ class PathGenerator(cp_model.CpSolverSolutionCallback):
 
 
 class DTreeSubProblemSat(BaseSubproblem):
-    """Same as DTreeSubProblem but CpModel formulation to use OR-Tools SAT 
-    solver."""
+    """TODO: Documentation."""
 
     def __init__(self, leaf, nodes, splits, targets,
                  depth, data_rows=None) -> None:
@@ -1666,6 +1608,8 @@ class DTreeSubProblemSat(BaseSubproblem):
         return int(round(value * self.objective_scale))
 
     def create_submip(self, leaf_dual, row_duals, ns_duals, cut_duals):
+        """TODO: Documentation.
+        """
         assert not self.generated_, "SP is already created."
 
         # obj = cp_model.LinearExpr()
@@ -1811,7 +1755,8 @@ class DTreeSubProblemSat(BaseSubproblem):
         self.generated_ = True
 
     def update_objective(self, leaf_dual, row_duals, ns_duals, cut_duals):
-
+        """TODO: Documentation.
+        """
         assert self.generated_, "Called update_objective before generating SP"
         # obj = cp_model.LinearExpr()
         # TODO: This method is slow. Make it faster.
@@ -1925,7 +1870,8 @@ class DTreeSubProblemSat(BaseSubproblem):
             self.add_cut_rows(cut_rows)
 
     def row_satisfies_split(self, row, split):
-
+        """TODO: Documentation.
+        """
         feature = split.feature
         threshold = split.threshold
         if self.X_[row, feature] <= threshold:
@@ -1933,7 +1879,8 @@ class DTreeSubProblemSat(BaseSubproblem):
         return False
 
     def generate_columns(self, X, y, dual_costs, params=""):
-
+        """TODO: Documentation.
+        """
         self.X_ = X
         self.y_ = y
         leaf_dual = dual_costs[0][self.leaf_id_]
@@ -1967,8 +1914,7 @@ class DTreeSubProblemSat(BaseSubproblem):
 
 
 class DTreeSubProblemHeuristic(BaseSubproblem):
-    """Generates random paths and return the ones with postive reduced
-    cost."""
+    """TODO: Documentation."""
 
     def __init__(self, leaves, nodes, splits, targets,
                  depth, data_rows=None) -> None:
@@ -1984,8 +1930,9 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
         self.success_rounds = 0
 
     def generate_columns(self, X, y, dual_costs, params=""):
-        """Generate random paths and return the ones with postive reduced
-        cost."""
+        """ TODO: Documentation."""
+        # Generate random columns and return the ones with postive reduced
+        # cost.
         generated_paths = []
         # return generated_paths
         for iter in range(100):
@@ -2083,6 +2030,7 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
 
     def get_reduced_cost(self, X, y, dual_costs, path,
                          row_satisfies_path_array):
+        """TODO: Documentation."""
 
         n_rows = X.shape[0]
         leaves_dual = dual_costs[0]
@@ -2116,8 +2064,7 @@ class DTreeSubProblemHeuristic(BaseSubproblem):
 
 
 class DTreeSubProblemOld(BaseSubproblem):
-    """Subproblem model for each leaf and target. This is the old subproblem
-    model that is described in Firat et al. (2020)"""
+    """TODO: Documentation."""
 
     def __init__(self, leaf, nodes, splits, target,
                  depth, data_rows=None,
@@ -2137,6 +2084,8 @@ class DTreeSubProblemOld(BaseSubproblem):
         self.iter_ = 0
 
     def create_submip(self, leaf_dual, row_duals, ns_duals, cut_duals):
+        """TODO: Documentation.
+        """
         assert not self.generated_, "SP is already created."
         infinity = self.solver_.infinity()
         self.solver_.SetNumThreads(7)
@@ -2245,7 +2194,8 @@ class DTreeSubProblemOld(BaseSubproblem):
         self.generated_ = True
 
     def update_objective(self, leaf_dual, row_duals, ns_duals, cut_duals):
-
+        """TODO: Documentation.
+        """
         objective = self.solver_.Objective()
         n_rows = self.X_.shape[0]
         for i in range(n_rows):
@@ -2323,6 +2273,8 @@ class DTreeSubProblemOld(BaseSubproblem):
         self.cut_rows_starting_index += n_cut_rows
 
     def generate_columns(self, X, y, dual_costs, params=""):
+        """TODO: Documentation.
+        """
 
         # Solve sub problem
         result_status = self.solver_.Solve(get_params_from_string(params))
@@ -2401,7 +2353,8 @@ class DTreeSubProblemOld(BaseSubproblem):
             self.add_cut_rows(cut_rows)
 
     def row_satisfies_split(self, row, split):
-
+        """TODO: Documentation.
+        """
         feature = split.feature
         threshold = split.threshold
         if self.X_[row, feature] <= threshold:
@@ -2410,56 +2363,7 @@ class DTreeSubProblemOld(BaseSubproblem):
 
 
 class DTreeClassifier(ColGenClassifier):
-    """The decision tree classifier trained using column generation. This
-    improves on the trees generated by CART. For each node, a list of
-    candidate split checks must be provided. The classifier selects one split
-    check for each node that optimizes the accuracy over given training 
-    dataset.
-
-    Parameters
-    ----------
-    initial_paths: list(Path), default=[],
-        List of paths used for initializing RMP. The initial paths must form a
-        valid tree for this classifier to work correctly. 
-    leaves: list(Leaf), default=[],
-        List of leaves in the tree.
-    nodes: list(Node), default=[],
-        List of nodes in the tree. 
-    splits: list(Split), default=[],
-        List of all split checks used in each node.
-    tree_depth: int, default=1,
-        Depth of the tree.
-    targets: list(int), default=[],
-        List of all target ids. The targets must start from 0. 
-    max_iterations: int, default=-1,
-        If non-negative, it represents the limit on number of CG iterations.
-    time_limit: int, default=-1,
-        If non-negative, it represents the time limit for training.
-    num_master_cuts_round: int, default=3,
-        Number of cut generation rounds performed in master problem per 
-        iteration.
-    master_beta_constraints_as_cuts: bool, default=False,
-        If true, the beta constraints in the RMP are used as cutting planes.
-        They will only be added if the LP solution violates them.
-    master_generate_cuts: bool, default=False,
-        If true, the model also tries to generate beta cuts that are not
-        present in the dataset.
-    data_rows: list(Row), 
-        Preprocessed training rows information.
-    use_old_sp: bool, default=False,
-        If true, uses old subproblem model. Used for experiments.
-    master_solver_type: string, default='glop',
-        Describes the solver used for solving the master problem. Use 'glop'
-        for testing.
-    rmp_solver_params: string, default = "",
-        Solver parameters for solving restricted master problem (rmp).
-    master_ip_solver_params: string, default = "",
-        Solver parameters for solving the integer master problem.
-    subproblem_params: list of strings, default = ["",""],
-        Parameters for solving the subproblem. First string is for the
-        heuristic method and the second is for the integer program.
-
-
+    """TODO: Documentation.
     """
 
     def __init__(self, initial_paths=[], leaves=[], nodes=[], splits=[],
@@ -2470,6 +2374,7 @@ class DTreeClassifier(ColGenClassifier):
                  master_beta_constraints_as_cuts=False,
                  master_generate_cuts=False,
                  data_rows=None,
+                 rmp_is_ip=True,
                  use_old_sp=False,
                  master_solver_type='glop',
                  rmp_solver_params="",
@@ -2555,25 +2460,18 @@ class DTreeClassifier(ColGenClassifier):
 
         super().__init__(max_iterations, time_limit,
                          self.master_problem, self.subproblems,
-                         True, rmp_solver_params, master_ip_solver_params,
+                         rmp_is_ip, rmp_solver_params, master_ip_solver_params,
                          all_subproblem_params)
 
     def _more_tags(self):
+        """TODO: Documentation.
+        """
         return {'X_types': ['categorical'],
                 'non_deterministic': True,
                 'binary_only': True}
 
     def predict(self, X):
-        """Predicts the class based on the solution of master problem. 
-        Parameters
-        ----------
-        X : array-like, shape (n_samples, n_features)
-            The input samples. The inputs should only contain numeric values.
-
-        Returns
-        -------
-        y : ndarray, shape (n_samples,)
-            The label for each sample.
+        """TODO: Documentation.
         """
         X = check_array(X, accept_sparse=True)
         check_is_fitted(self, 'is_fitted_')
