@@ -293,6 +293,7 @@ def main(argv):
                           num_master_cuts_round=10,
                           master_beta_constraints_as_cuts=True,
                           master_generate_cuts=False,
+                          master_solver_type='gurobi_lp',
                           use_old_sp=use_old_sp)
     clf.fit(X_train.to_numpy(), y_train)
 
