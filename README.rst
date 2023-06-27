@@ -26,9 +26,19 @@ and (hyper)parameter search, while facilitating testing (including some API
 compliance), documentation, open source development, packaging, and continuous
 integration.
 
-An example extension of a column generation based binary classifier (Boolean 
-Decision Rule Generation by S. Dash et. al. 2018) is included. The developer 
-needs to extend the master and subproblem classes and implement the required
-methods. The coumn generation part is taken care of by the template fit method.
+Following example extensions of a column generation based binary classifiers 
+are included.
+- Boolean Decision Rule Generation by S. Dash et. al. 2018 
+- Decision Tree classifiers by Firat et. al. 2020 (modified)  
+
+The developer needs to extend the master and subproblem classes and implement 
+the required methods. The coumn generation part is taken care of by the 
+template fit method.
+
+The Decision Tree Classifier experiments can be launched from the example 
+directory. See the README file in the examples directory for details.
+
+To reproduce the results submitted in the Decision tree paper, use the branch
+'dtreedev'.
 
 *Thank you for cleanly contributing to the estimator template!*
