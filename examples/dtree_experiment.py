@@ -1,4 +1,14 @@
-"""TODO: Documentation."""
+"""Code to launch decision tree experiments.
+Usage:
+python dtree_experiment.py \
+-T <Training data file> \
+-t <Testing data file> \
+-S <CSV separator> \
+-d <Depth of decision tree> \
+-s <Time limit in seconds> \
+-i <Column Generation iteration limit> \
+-r <Results directory>
+"""
 
 import math
 import random
