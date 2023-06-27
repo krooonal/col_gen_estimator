@@ -2363,7 +2363,50 @@ class DTreeSubProblemOld(BaseSubproblem):
 
 
 class DTreeClassifier(ColGenClassifier):
-    """TODO: Documentation.
+    """Decision Tree classifier using column generation.
+
+    Parameters
+    ----------
+    initial_paths: list(Path), default=[],
+        List of paths used to initialize the master problem. The user must
+        ensure that a valid tree can be formed using the initial paths.
+    leaves: list(Leaf), default=[],
+        List of leaves in the tree.
+    nodes: list(Node), default=[],
+        List of nodes in the tree.
+    splits: list(Split), default=[],
+        List of split checks used in the nodes.
+    tree_depth: int, default=1,
+        Depth of the tree.
+    targets: list(int), default=[],
+        List of target ids. They must start from 0.
+    max_iterations: int, default=-1
+        Maximum column generation iterations. Negative values removes the
+        iteration limit and the problem is solved till optimality.
+    time_limit: int, default=-1,
+        Time limit in seconds for training. Negative values removes the
+        time limit and the problem is solved till optimality.
+    num_master_cuts_round: int, default=3,
+        Number of times the master problem adds cuts in an iteration.
+    master_beta_constraints_as_cuts: bool, default=False,
+        If True, adds existing beta constraints (constraints for data rows) as
+        cutting planes in the master problem.
+    master_generate_cuts: bool, default=False,
+        If True, master problem generates new beta cuts using SAT solver.
+    data_rows: list(Row), default=None,
+        Preprocessed data rows. The preprocessed rows help with faster running
+        times.
+    use_old_sp: bool, default=False,
+        If True, uses the old subproblem model published in Firat et. al. 2020.
+    master_solver_type: str, default='glop',
+        Solver for RMP from OR-Tools. Use 'glop' for tests. See OR-Tools
+        documentation for other possible values.
+    rmp_solver_params: string, default = "",
+        Solver parameters for solving restricted master problem (rmp).
+    master_ip_solver_params: string, default = "",
+        Solver parameters for solving the integer master problem.
+    subproblem_params: list of strings, default = [""],
+        Parameters for solving the subproblem.
     """
 
     def __init__(self, initial_paths=[], leaves=[], nodes=[], splits=[],
@@ -2374,7 +2417,6 @@ class DTreeClassifier(ColGenClassifier):
                  master_beta_constraints_as_cuts=False,
                  master_generate_cuts=False,
                  data_rows=None,
-                 rmp_is_ip=True,
                  use_old_sp=False,
                  master_solver_type='glop',
                  rmp_solver_params="",
@@ -2458,20 +2500,29 @@ class DTreeClassifier(ColGenClassifier):
                 self.subproblems[1].append(subproblem)
                 all_subproblem_params[1].append(subproblem_params)
 
+        rmp_is_ip = True
         super().__init__(max_iterations, time_limit,
                          self.master_problem, self.subproblems,
                          rmp_is_ip, rmp_solver_params, master_ip_solver_params,
                          all_subproblem_params)
 
     def _more_tags(self):
-        """TODO: Documentation.
-        """
         return {'X_types': ['categorical'],
                 'non_deterministic': True,
                 'binary_only': True}
 
     def predict(self, X):
-        """TODO: Documentation.
+        """Predicts the class based on the solution of master problem. 
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+            The input samples. The inputs should only contain numeric values.
+
+        Returns
+        -------
+        y : ndarray, shape (n_samples,)
+            The label for each sample.
         """
         X = check_array(X, accept_sparse=True)
         check_is_fitted(self, 'is_fitted_')
