@@ -150,7 +150,7 @@ def main(argv):
         if preprocessing_time_limit > 0 and time() - t0 > preprocessing_time_limit:
             break
         X_train_train, _, y_train_train, _ = train_test_split(
-            X_train, y_train, test_size=0.3, random_state=i)
+            X_train, y_train, test_size=0.1, random_state=i)
         dt = tree.DecisionTreeClassifier(
             max_depth=experiment_max_depth, random_state=99)
         clf_dt = dt.fit(X_train_train, y_train_train)
