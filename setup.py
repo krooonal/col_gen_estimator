@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 from col_gen_estimator._version import __version__
 
 DISTNAME = 'ColGenEstimator'
-DESCRIPTION = 'TODO'
+DESCRIPTION = 'Classifiers using column generation'
 with codecs.open('README.rst', encoding='utf-8-sig') as f:
     LONG_DESCRIPTION = f.read()
 MAINTAINER = 'K. Patel'
@@ -16,7 +16,7 @@ URL = 'https://github.com/krooonal/col_gen_estimator'
 LICENSE = 'new BSD'
 DOWNLOAD_URL = 'https://github.com/krooonal/col_gen_estimator'
 VERSION = __version__
-INSTALL_REQUIRES = ['numpy', 'scipy', 'scikit-learn', 'ortools']
+INSTALL_REQUIRES = ['numpy', 'scipy', 'scikit-learn', 'ortools', 'bitarray']
 CLASSIFIERS = ['Intended Audience :: Science/Research',
                'Intended Audience :: Developers',
                'License :: OSI Approved',
