@@ -97,7 +97,7 @@ def test_heuristics(data):
 
 def test_mp_satisfies_clause():
     master_problem = BDRMasterProblem(
-        C=10, p=1, optimization_problem_type='glop')
+        C=10, p=1, solver_str='glop')
     assert_equal(master_problem.satisfies_clause(
         [0, 1, 1, 1, 0, 0, 0], [1, 2, 3]), 1)
     assert_equal(master_problem.satisfies_clause(
@@ -110,7 +110,7 @@ def test_mp_satisfies_clause():
 
 def test_generate_lexicographic_clause():
     master_problem = BDRMasterProblem(
-        C=10, p=1, optimization_problem_type='glop')
+        C=10, p=1, solver_str='glop')
     assert_array_equal(master_problem.generate_lexicographic_clause(0), [])
     assert_array_equal(master_problem.generate_lexicographic_clause(5), [0, 2])
     assert_array_equal(master_problem.generate_lexicographic_clause(6), [1, 2])
@@ -119,7 +119,7 @@ def test_generate_lexicographic_clause():
 def test_get_objective_coeff_mp(data):
     # Test how many zero examples satisfies the clause
     master_problem = BDRMasterProblem(
-        C=10, p=1, optimization_problem_type='glop')
+        C=10, p=1, solver_str='glop')
     master_problem.generate_mp(data[0], data[1])
     assert_equal(master_problem.get_objective_coeff_mp(clause=[0, 3]), 1)
     assert_equal(master_problem.get_objective_coeff_mp(clause=[2]), 2)
@@ -133,7 +133,7 @@ def test_get_clause_coeffs(data):
     # [positive examples] Coeff = 1 if example satisfies clause,
     # [complexity] Coeff = size of clause +1
     master_problem = BDRMasterProblem(
-        C=10, p=1, optimization_problem_type='glop')
+        C=10, p=1, solver_str='glop')
     assert_equal(master_problem.generated_, False)
     master_problem.generate_mp(data[0], data[1])
     assert_equal(master_problem.generated_, True)
@@ -146,7 +146,7 @@ def test_get_clause_coeffs(data):
 
 def test_duals(data):
     master_problem = BDRMasterProblem(
-        C=10, p=1, optimization_problem_type='glop')
+        C=10, p=1, solver_str='glop')
     master_problem.generate_mp(data[0], data[1])
     cc_dual, cs_duals = master_problem.solve_rmp()
     assert_equal(cc_dual, 0)
@@ -155,7 +155,7 @@ def test_duals(data):
 
 def test_add_column(data):
     master_problem = BDRMasterProblem(
-        C=10, p=1, optimization_problem_type='glop')
+        C=10, p=1, solver_str='glop')
     master_problem.generate_mp(data[0], data[1])
     clause = [0, 1]  # Clause that is only satisfied by positive examples.
     assert_equal(master_problem.add_column(clause), True)
@@ -166,7 +166,7 @@ def test_add_column(data):
 
 def test_add_empty_column(data):
     master_problem = BDRMasterProblem(
-        C=10, p=1, optimization_problem_type='glop')
+        C=10, p=1, solver_str='glop')
     master_problem.generate_mp(data[0], data[1])
     clause = []
     assert_equal(master_problem.add_column(clause), False)
@@ -176,7 +176,7 @@ def test_regenerate_mp(data):
     # This test should cover the 'if' check at the start of 'generate_mp'
     # method.
     master_problem = BDRMasterProblem(
-        C=10, p=1, optimization_problem_type='glop')
+        C=10, p=1, solver_str='glop')
     assert_equal(master_problem.generated_, False)
     master_problem.generate_mp(data[0], data[1])
     assert_equal(master_problem.generated_, True)
@@ -185,7 +185,7 @@ def test_regenerate_mp(data):
 
 
 def test_sp_generate_column(data):
-    subproblem = BDRSubProblem(D=10, optimization_problem_type='cbc')
+    subproblem = BDRSubProblem(D=10, solver_str='cbc')
     assert_equal(subproblem.generated_, False)
     clauses = subproblem.generate_columns(
         data[0], data[1], dual_costs=(0, [1, 1]))

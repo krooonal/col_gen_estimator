@@ -5,6 +5,9 @@ column generation based classifiers.
 
 from time import time
 
+from ortools.linear_solver import pywraplp
+from ortools.sat.python import cp_model
+
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_X_y
 from sklearn.utils.multiclass import unique_labels
@@ -16,7 +19,8 @@ class BaseMasterProblem():
     ColGenClassifier.
     """
 
-    def __init__(self):
+    def __init__(self, solver_str='glop'):
+        self.solver_ = pywraplp.Solver.CreateSolver(solver_str)
         pass
 
     def generate_mp(self, X, y):
@@ -71,6 +75,10 @@ class BaseSubproblem():
     """ Base class for subproblem. One needs to extend this for using with
     ColGenClassifier.
     """
+
+    def __init__(self, solver_str='cbc') -> None:
+        self.cp_solver_ = cp_model.CpSolver()
+        self.solver_ = pywraplp.Solver.CreateSolver(solver_str)
 
     def generate_columns(self, X, y, dual_costs, params):
         """ Generates the new columns to be added to the RMP.

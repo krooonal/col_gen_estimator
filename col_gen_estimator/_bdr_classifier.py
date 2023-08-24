@@ -119,7 +119,7 @@ class BDRMasterProblem(BaseMasterProblem):
         A parameter used for balancing the penalty between false negatives and
         false positives.
         Higher value of p would result in more penalty for the false negatives.
-    optimization_problem_type : string, default='glop',
+    solver_str : string, default='glop',
         Describes the solver used for solving the master problem.
 
     Attributes
@@ -148,11 +148,11 @@ class BDRMasterProblem(BaseMasterProblem):
         True when the master problem model has been generated. False otherwise.
     """
 
-    def __init__(self, C=10, p=1, optimization_problem_type='glop'):
+    def __init__(self, C=10, p=1, solver_str='glop'):
+        super(BDRMasterProblem, self).__init__(solver_str)
         self.generated_ = False
         self.C_ = C
         self.p_ = p
-        self.solver_ = pywraplp.Solver.CreateSolver(optimization_problem_type)
 
         # Vars
         self.clause_vars_ = None
@@ -430,7 +430,7 @@ class BDRSubProblem(BaseSubproblem):
     D : int,
         A parameter used for controlling the complexity of the clause being
         generated.
-    optimization_problem_type : string, default='cbc'
+    solver_str : string, default='cbc'
         Describes the solver used for solving the subproblem (2).
 
     Attributes
@@ -451,9 +451,9 @@ class BDRSubProblem(BaseSubproblem):
         True when the master problem model has been generated. False otherwise.
     """
 
-    def __init__(self, D, optimization_problem_type='cbc'):
+    def __init__(self, D, solver_str='cbc'):
+        super(BDRSubProblem, self).__init__(solver_str=solver_str)
         self.D_ = D
-        self.solver_ = pywraplp.Solver.CreateSolver(optimization_problem_type)
         self.generated_ = False
 
         # Vars
