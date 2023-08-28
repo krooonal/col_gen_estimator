@@ -10,6 +10,7 @@ from ._dtree_classifier import Path, Node, Split, Leaf, Row
 from ._dtree_classifier import DTreeMasterProblem, DTreeSubProblem
 from ._dtree_classifier import DTreeClassifier
 from ._dtree_classifier import DTreeSubProblemHeuristic
+from ._parameter_tuner import Parameter, RunningStat
 
 from ._version import __version__
 
@@ -19,5 +20,5 @@ __all__ = ['BaseMasterProblem', 'BaseSubproblem', 'ColGenClassifier',
            'BooleanDecisionRuleClassifierWithHeuristic',
            'Path', 'Node', 'Split', 'Leaf', 'Row',
            'DTreeMasterProblem', 'DTreeSubProblem', 'DTreeSubProblemHeuristic',
-           'DTreeClassifier',
+           'DTreeClassifier', 'Parameter', 'RunningStat',
            '__version__']

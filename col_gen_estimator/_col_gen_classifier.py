@@ -17,6 +17,15 @@ from sklearn.preprocessing import LabelEncoder
 class BaseMasterProblem():
     """ Base class for master problem. One needs to extend this for using with
     ColGenClassifier.
+    Parameters
+    ----------
+    solver_str : string, default='glop'
+        Describes the solver used for solving the masterproblem.
+
+    Attributes
+    ----------
+    solver_ : MPSolver from OR-Tools,
+        The solver used for solving the masterproblem.
     """
 
     def __init__(self, solver_str='glop'):
@@ -74,6 +83,19 @@ class BaseMasterProblem():
 class BaseSubproblem():
     """ Base class for subproblem. One needs to extend this for using with
     ColGenClassifier.
+    Parameters
+    ----------
+    solver_str : string, default='cbc'
+        Describes the solver used for solving the subproblem. This is only used
+        when MPSolver interface is used for solving subproblem.
+
+    Attributes
+    ----------
+    solver_ : MPSolver from OR-Tools,
+        The solver used for solving the subproblem.
+    cp_solver_ : CpSolver from OR-Tools,
+        Sometimes we solve subproblems using OR-Tools CP-SAT solver instead
+        of MPSolver.
     """
 
     def __init__(self, solver_str='cbc') -> None:
