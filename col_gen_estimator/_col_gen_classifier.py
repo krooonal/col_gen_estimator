@@ -13,6 +13,8 @@ from sklearn.utils.validation import check_X_y
 from sklearn.utils.multiclass import unique_labels
 from sklearn.preprocessing import LabelEncoder
 
+from ._parameter_tuner import Parameter
+
 
 class BaseMasterProblem():
     """ Base class for master problem. One needs to extend this for using with
@@ -96,11 +98,44 @@ class BaseSubproblem():
     cp_solver_ : CpSolver from OR-Tools,
         Sometimes we solve subproblems using OR-Tools CP-SAT solver instead
         of MPSolver.
+    tunable_params_ : dict (string->Parameter)
+        Dictionary of all tunable solver parameters.
     """
 
     def __init__(self, solver_str='cbc') -> None:
         self.cp_solver_ = cp_model.CpSolver()
         self.solver_ = pywraplp.Solver.CreateSolver(solver_str)
+        self.tunable_params_ = BaseSubproblem.get_tunable_params()
+
+    @staticmethod
+    def get_tunable_params():
+        """ Returns the list of all parameters we tune in the cp_solver_"""
+        params = {}
+        # interleave_search = Parameter(0.3, 'interleave_search', 15189)
+        # interleave_search.add_value(False)
+        # interleave_search.add_value(True)
+        # interleave_search.set_switch_flag(1)
+        # params['interleave_search'] = interleave_search
+
+        presolve_iterations = Parameter(0.3, 'max_presolve_iterations', 1564)
+        presolve_iterations.add_value(3)
+        presolve_iterations.add_value(4)
+        presolve_iterations.add_value(2)
+        presolve_iterations.set_explore_count(15)
+        params['max_presolve_iterations'] = presolve_iterations
+
+        probing_level = Parameter(0.3, 'cp_model_probing_level', 987234)
+        probing_level.add_value(2)
+        probing_level.add_value(1)
+        probing_level.set_switch_flag(1 << 1)
+        params['cp_model_probing_level'] = probing_level
+
+        lns_workers = Parameter(0.3, 'min_num_lns_workers', 25646)
+        lns_workers.add_value(2)
+        lns_workers.add_value(0)
+        lns_workers.set_switch_flag(1 << 2)
+        params['min_num_lns_workers'] = lns_workers
+        return params
 
     def generate_columns(self, X, y, dual_costs, params):
         """ Generates the new columns to be added to the RMP.
@@ -132,6 +167,74 @@ class BaseSubproblem():
             The dual costs and other information needed to update the
             subproblem.
         """
+        return
+
+    def solve_model(self, model, time_limit=30, callback=None):
+        """ Solves the given model. This method reuses the information
+        generated from previous solves of the subproblem to tune the solver
+        parameters. As of now it only tunes parameters of the CP solver.
+        Parameters
+        ----------
+        model: cp_model.CpModel
+            The model to solve.
+        time_limit: int
+            Time limit to solve the model in seconds.
+        callback: cp_model.CpSolverSolutionCallback
+            Optional callback to capture intermediate solutions.
+        """
+        if self.cp_solver_ == None:
+            return
+
+        self.cp_solver_.parameters.num_search_workers = 7
+        self.cp_solver_.parameters.max_time_in_seconds = time_limit
+
+        # self.cp_solver_.parameters.interleave_search = self.tunable_params_[
+        #     'interleave_search'].get_best_value()
+        self.cp_solver_.parameters.min_num_lns_workers = self.tunable_params_[
+            'min_num_lns_workers'].get_best_value()
+        self.cp_solver_.parameters.cp_model_probing_level = self.tunable_params_[
+            'cp_model_probing_level'].get_best_value()
+        self.cp_solver_.parameters.max_presolve_iterations = self.tunable_params_[
+            'max_presolve_iterations'].get_best_value()
+
+        # for key in self.tunable_params_:
+        #     self.tunable_params_[key].print_stats()
+
+        status = self.cp_solver_.Solve(model, callback)
+
+        time_to_solve = self.cp_solver_.WallTime()
+        time_score = time_to_solve / time_limit
+        gap_score = 1
+        if status == cp_model.OPTIMAL:
+            gap_score = 0
+        elif status == cp_model.FEASIBLE:
+            objective = self.cp_solver_.ObjectiveValue()
+            bound = self.cp_solver_.BestObjectiveBound()
+            gap = abs(objective - bound)
+            time_score = 1
+            if objective * bound >= 0:
+                gap_score = gap / max(abs(objective), abs(bound))
+        else:
+            time_score = 1
+            gap_score = 1
+
+        total_score = time_score + gap_score
+        print("Time to solve: ", time_to_solve)
+        print("Time score: ", time_score)
+        print("Gap score: ", gap_score)
+        print("Total score: ", total_score)
+
+        # self.tunable_params_['interleave_search'].adjust_score(-total_score)
+        # self.tunable_params_['min_num_lns_workers'].adjust_score(-total_score)
+        # self.tunable_params_[
+        #     'cp_model_probing_level'].adjust_score(-total_score)
+        # self.tunable_params_[
+        #     'max_presolve_iterations'].adjust_score(-total_score)
+
+        for key in self.tunable_params_:
+            self.tunable_params_[key].adjust_score(-total_score)
+            self.tunable_params_[key].print_stats()
+
         return
 
 

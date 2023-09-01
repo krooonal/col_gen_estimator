@@ -1896,7 +1896,8 @@ class DTreeSubProblemSat(BaseSubproblem):
                                        self.targets_,
                                        self.nodes_,
                                        self.orig_obj_coeffs)
-        status = self.cp_solver_.Solve(self.model_, path_generator)
+        # status = self.cp_solver_.Solve(self.model_, path_generator)
+        self.solve_model(self.model_, time_limit=2, callback=path_generator)
         # print(self.leaf_id_, " Path generation status: ",
         #       sp_solver.StatusName(status))
         print(self.leaf_id_, " Path generation objective: ",

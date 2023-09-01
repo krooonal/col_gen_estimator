@@ -57,7 +57,7 @@ class Parameter:
         self.total_counts_ = 0
         self.mt_ = random.Random(seed)
         self.explore_count_ = 10
-        self.switch_flag_ = 0
+        self.switch_flag_ = 1
 
     def set_switch_flag(self, value):
         self.switch_flag_ = value
@@ -124,6 +124,6 @@ class Parameter:
         for i in range(len(self.values_)):
             print(
                 f"Value {self.values_[i]} count {self.counts_[i]} "
-                f"Qscore {self.scores_[i].mean()}"
+                f"Qscore {self.scores_[i].mean()} "
                 f"Final score {self.final_scores_[i]}"
             )
