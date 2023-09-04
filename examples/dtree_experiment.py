@@ -303,7 +303,8 @@ def main(argv):
                           num_master_cuts_round=10,
                           master_beta_constraints_as_cuts=True,
                           master_generate_cuts=False,
-                          use_old_sp=use_old_sp)
+                          use_old_sp=use_old_sp,
+                          master_solver_type='glop')
     clf.fit(X_train.to_numpy(), y_train)
 
     print(clf.mp_optimal_, clf.iter_, clf.time_elapsed_)
