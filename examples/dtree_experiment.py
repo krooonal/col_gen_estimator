@@ -346,6 +346,12 @@ def main(argv):
     print("Total added rows: ", len(added_rows))
     print("Last reset iter = ", clf.master_problem.last_reset_iter_)
 
+    for sp in clf.subproblems[1]:
+        print("Solve times: ", sp.solve_times_)
+        print("Gaps: ", sp.gaps_)
+        for key in sp.tunable_params_:
+            sp.tunable_params_[key].print_stats()
+
     attrs = vars(cg1_results)
     print('\n'.join("%s: %s" % item for item in attrs.items()))
 
@@ -563,7 +569,7 @@ def get_all_leaves_paths(all_nodes, depth, splits, X, y):
         path.leaf_id = leaf_id
         path.node_ids = []
         count = 2**(depth) - 1 + leaf_id
-        while(count > 0):
+        while (count > 0):
             father = math.floor((count-1) / 2)
             path.node_ids.append(father)
             selected_split = all_nodes[father].last_split
@@ -601,7 +607,7 @@ def get_path_for_leaf(leaf, tree_nodes, depth, splits, X, y):
     path.leaf_id = leaf.id
     path.node_ids = []
     count = 2**(depth) - 1 + leaf.id
-    while(count > 0):
+    while (count > 0):
         father = math.floor((count-1) / 2)
         path.node_ids.append(father)
         if father not in tree_nodes:

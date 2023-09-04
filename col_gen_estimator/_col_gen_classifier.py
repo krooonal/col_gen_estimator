@@ -100,12 +100,20 @@ class BaseSubproblem():
         of MPSolver.
     tunable_params_ : dict (string->Parameter)
         Dictionary of all tunable solver parameters.
+    solve_times_ : list(float)
+        Wall times for solving instances. Only filled when CP-SAT solver is
+        used for solving subproblems.
+    gaps_ : list(float)
+        Relative gaps after solving instances. Only filled when CP-SAT solver
+        is used for solving subproblems.
     """
 
     def __init__(self, solver_str='cbc') -> None:
         self.cp_solver_ = cp_model.CpSolver()
         self.solver_ = pywraplp.Solver.CreateSolver(solver_str)
         self.tunable_params_ = BaseSubproblem.get_tunable_params()
+        self.solve_times_ = []
+        self.gaps_ = []
 
     @staticmethod
     def get_tunable_params():
@@ -219,10 +227,12 @@ class BaseSubproblem():
             gap_score = 1
 
         total_score = time_score + gap_score
-        print("Time to solve: ", time_to_solve)
-        print("Time score: ", time_score)
-        print("Gap score: ", gap_score)
-        print("Total score: ", total_score)
+        # print("Time to solve: ", time_to_solve)
+        # print("Time score: ", time_score)
+        # print("Gap score: ", gap_score)
+        # print("Total score: ", total_score)
+        self.solve_times_.append(time_to_solve)
+        self.gaps_.append(gap_score)
 
         # self.tunable_params_['interleave_search'].adjust_score(-total_score)
         # self.tunable_params_['min_num_lns_workers'].adjust_score(-total_score)
@@ -233,7 +243,7 @@ class BaseSubproblem():
 
         for key in self.tunable_params_:
             self.tunable_params_[key].adjust_score(-total_score)
-            self.tunable_params_[key].print_stats()
+            # self.tunable_params_[key].print_stats()
 
         return
 
