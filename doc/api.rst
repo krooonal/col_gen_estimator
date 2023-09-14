@@ -1,5 +1,5 @@
 ####################
-project-template API
+col_gen_estimator API
 ####################
 
 This is an example on how to document the API of your own project.
@@ -14,12 +14,44 @@ Estimator
    :template: class.rst
 
    BooleanDecisionRuleClassifier
+   BooleanDecisionRuleClassifierWithHeuristic
+   DTreeClassifier
 
-Predictor
+Master Problems
 =========
 
 .. autosummary::
    :toctree: generated/
    :template: class.rst
 
-    BooleanDecisionRuleClassifier
+   BDRMasterProblem
+   DTreeMasterProblem
+
+Subproblems and heuristics
+=========
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   BDRSubProblem
+   BDRHeuristic
+   DTreeSubProblem
+   DTreeSubProblemSat
+   DTreeSubProblemHeuristic
+   DTreeSubProblemOld
+
+Other Classifiers
+=========
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   PathGenerator
+   Row
+   Path
+   Node
+   Leaf
+   Split
+   CutGenerator
