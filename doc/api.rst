@@ -41,7 +41,7 @@ Subproblems and heuristics
    DTreeSubProblemHeuristic
    DTreeSubProblemOld
 
-Other Classifiers
+Other Classes
 =========
 
 .. autosummary::

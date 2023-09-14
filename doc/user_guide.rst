@@ -22,12 +22,10 @@ We can also choose to not use the OR-Tools MPSolver but this is not recommended.
 
 We need to implement the following abstract methods.
 
-* ``generate_mp``: Generates the master problem model (RMP) and initializes the primal
-        and dual solutions.
+* ``generate_mp``: Generates the master problem model (RMP) and initializes the primal and dual solutions.
 * ``add_column``: Adds the given column to the master problem model.
 * ``solve_rmp``: Solves the RMP with given solver params. Returns the dual costs.
-* ``solve_ip``: Solves the integer RMP with given solver params.
-        Returns false if the problem is not solved.
+* ``solve_ip``: Solves the integer RMP with given solver params. Returns false if the problem is not solved.
 
 Subproblem
 ---------
@@ -48,6 +46,7 @@ The :class:`BaseSubproblem` also provides support to solve the subproblems using
 CP-SAT solver (with automated parameter tuning). 
 
 We need to implement the following abstract method.
+
 * ``generate_columns``: Generates the new columns to be added to the RMP.
 
 
@@ -70,11 +69,8 @@ Once imported, we can create a class which inherate from this base class::
 
 .. _mixin: https://en.wikipedia.org/wiki/Mixin
 
-Predictor
----------
-
 Classifier
-~~~~~~~~~~
+---------
 
 Classifiers implement ``predict``. In addition, they
 output the probabilities of the prediction using the ``predict_proba`` method:
