@@ -133,6 +133,7 @@ from time import time
 class Row:
     """To make the processing faster, we store some row related information in
     this class.
+
     Attributes
     ----------
     id: (int) ID of the row.
@@ -172,6 +173,7 @@ class Row:
 
 class Path:
     """All path related information.
+
     Attributes
     ----------
     leaf_id: (int) ID of the associated leaf.
@@ -195,6 +197,7 @@ class Path:
     def is_same_as(self, path):
         """ Returns true if the current path is same as the path in the
         argument.
+
         Parameters
         ----------
         path: (Path) The other path being compared to.
@@ -269,7 +272,6 @@ class Node:
     last_split: (int) ID of the last split added to the candidate_splits. Used
         only at the initialization and not during training.
     parent: (int) ID of the parent node. Parent of the root node is -1.
-    # child is -1 for the leaves.
     left_child: (int) ID of the left child node. -1 if the child is a leaf.
     right_child: (int) ID of the right child node. -1 if the child is a leaf.
     children_are_leaves: (bool) True if the children of this node are leaves.
@@ -290,6 +292,7 @@ class Node:
 
 class Leaf:
     """All leaf related information.
+
     Attributes
     ----------
     id: (int) ID of the leaf.
@@ -307,6 +310,7 @@ class Leaf:
     def create_leaf(self, id, depth) -> None:
         """Given the id and depth of the leaf, populates the left_nodes and
         right_nodes attributes.
+
         Parameters
         ----------
         id: (int) ID of the leaf.
@@ -327,6 +331,7 @@ class Leaf:
 
 class Split:
     """All split related information.
+
     Attributes
     ----------
     id: (int) ID of the split.
@@ -361,6 +366,7 @@ def get_satisfied_rows(path, leaf, splits):
     """Returns the set of satisfied rows for the given path.
     We use set intersection to compute this faster. This requires that we store
     the set of rows that take a specific branch on each split.
+
     Parameters
     ----------
     path: (Path) the path.
@@ -391,6 +397,7 @@ def get_satisfied_cuts(path, leaf, splits):
     """Returns the set of satisfied cut (beta) rows for the given path.
     We use set intersection to compute this faster. This requires that we store
     the set of cuts that take a specific branch on each split.
+
     Parameters
     ----------
     path: (Path) the path.
@@ -420,6 +427,7 @@ def get_satisfied_cuts(path, leaf, splits):
 def row_satisfies_path(X_row, leaf, splits, path):
     """Returns true if the passed row follows the path. The row may have
     different target than the path.
+
     Parameters
     ----------
     X_row:  ndarray, shape (1, n_features)
@@ -449,6 +457,7 @@ def get_params_from_string(params):
     This method is not yet implemented completely.
     By default we keep the incrementality on and use the primal simplex as the
     lp algorithm.
+
     Parameters
     ----------
     params : string,
@@ -468,6 +477,7 @@ def get_params_from_string(params):
 
 class CutGenerator(cp_model.CpSolverSolutionCallback):
     """Track intermediate solutions.
+
     Attributes
     ----------
     path_vars: (list(int)) Indices of path vars in the solver.
@@ -1111,6 +1121,7 @@ class DTreeMasterProblem(BaseMasterProblem):
     def solve_ip(self, solver_params=''):
         """Solves the integer RMP with given solver params.
         Returns True if the tree is generated.
+
         Parameters
         ----------
         solver_params : string, default='',
@@ -1490,6 +1501,7 @@ class DTreeSubProblem(BaseSubproblem):
 
 class PathGenerator(cp_model.CpSolverSolutionCallback):
     """Track intermediate solutions of sp.
+
     Attributes
     ----------
     TODO
