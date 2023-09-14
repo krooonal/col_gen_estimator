@@ -1,6 +1,6 @@
 .. -*- mode: rst -*-
 
-|AppVeyor|_ |Codecov|_ |CircleCI|_
+|AppVeyor|_ |Codecov|_ |CircleCI|_ |Readthedocs|_
 
 .. |AppVeyor| image:: https://ci.appveyor.com/api/projects/status/6eo2m9ydofn1nvb6?svg=true
 .. _AppVeyor: https://ci.appveyor.com/api/projects/status/6eo2m9ydofn1nvb6
@@ -11,6 +11,8 @@
 .. |CircleCI| image:: https://circleci.com/gh/krooonal/col_gen_estimator/tree/master.svg?style=svg
 .. _CircleCI: https://circleci.com/gh/krooonal/col_gen_estimator/tree/master
 
+.. |Readthedocs| image:: https://readthedocs.org/projects/col-gen-estimator/badge/?version=latest
+.. _Readthedocs: https://col-gen-estimator.readthedocs.io/en/latest/?badge=latest
 
 col_gen_estimator - A template for scikit-learn compatible column generation 
 based estimators contributions
