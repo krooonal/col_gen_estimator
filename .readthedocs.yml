@@ -7,11 +7,9 @@ build:
   tools:
     python: "3"
 
-
-
 formats:
   - pdf
-requirements_file: requirements.txt
+
 python:
   install:
     - requirements: requirements.txt
