@@ -1,5 +1,8 @@
+# Required
+version: 2
+
 formats:
-  - none
+  - pdf
 requirements_file: requirements.txt
 python:
   pip_install: true
