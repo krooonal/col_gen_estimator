@@ -133,6 +133,7 @@ from time import time
 class Row:
     """To make the processing faster, we store some row related information in
     this class.
+
     Attributes
     ----------
     id: (int) ID of the row.
@@ -172,6 +173,7 @@ class Row:
 
 class Path:
     """All path related information.
+
     Attributes
     ----------
     leaf_id: (int) ID of the associated leaf.
@@ -195,6 +197,7 @@ class Path:
     def is_same_as(self, path):
         """ Returns true if the current path is same as the path in the
         argument.
+
         Parameters
         ----------
         path: (Path) The other path being compared to.
@@ -248,7 +251,7 @@ class Path:
         self.leaf_id = leaf_id
         self.node_ids = []
         count = 2**(depth) - 1 + leaf_id
-        while(count > 0):
+        while (count > 0):
             father = math.floor((count-1) / 2)
             self.node_ids.append(father)
             count = father
@@ -269,7 +272,6 @@ class Node:
     last_split: (int) ID of the last split added to the candidate_splits. Used
         only at the initialization and not during training.
     parent: (int) ID of the parent node. Parent of the root node is -1.
-    # child is -1 for the leaves.
     left_child: (int) ID of the left child node. -1 if the child is a leaf.
     right_child: (int) ID of the right child node. -1 if the child is a leaf.
     children_are_leaves: (bool) True if the children of this node are leaves.
@@ -290,6 +292,7 @@ class Node:
 
 class Leaf:
     """All leaf related information.
+
     Attributes
     ----------
     id: (int) ID of the leaf.
@@ -307,6 +310,7 @@ class Leaf:
     def create_leaf(self, id, depth) -> None:
         """Given the id and depth of the leaf, populates the left_nodes and
         right_nodes attributes.
+
         Parameters
         ----------
         id: (int) ID of the leaf.
@@ -316,7 +320,7 @@ class Leaf:
         self.left_nodes = []
         self.right_nodes = []
         count = 2**(depth) - 1 + id
-        while(count > 0):
+        while (count > 0):
             father = math.floor((count-1) / 2)
             if count % 2 == 0:
                 self.right_nodes.append(father)
@@ -327,6 +331,7 @@ class Leaf:
 
 class Split:
     """All split related information.
+
     Attributes
     ----------
     id: (int) ID of the split.
@@ -361,6 +366,7 @@ def get_satisfied_rows(path, leaf, splits):
     """Returns the set of satisfied rows for the given path.
     We use set intersection to compute this faster. This requires that we store
     the set of rows that take a specific branch on each split.
+
     Parameters
     ----------
     path: (Path) the path.
@@ -391,6 +397,7 @@ def get_satisfied_cuts(path, leaf, splits):
     """Returns the set of satisfied cut (beta) rows for the given path.
     We use set intersection to compute this faster. This requires that we store
     the set of cuts that take a specific branch on each split.
+
     Parameters
     ----------
     path: (Path) the path.
@@ -420,6 +427,7 @@ def get_satisfied_cuts(path, leaf, splits):
 def row_satisfies_path(X_row, leaf, splits, path):
     """Returns true if the passed row follows the path. The row may have
     different target than the path.
+
     Parameters
     ----------
     X_row:  ndarray, shape (1, n_features)
@@ -449,6 +457,7 @@ def get_params_from_string(params):
     This method is not yet implemented completely.
     By default we keep the incrementality on and use the primal simplex as the
     lp algorithm.
+
     Parameters
     ----------
     params : string,
@@ -468,6 +477,7 @@ def get_params_from_string(params):
 
 class CutGenerator(cp_model.CpSolverSolutionCallback):
     """Track intermediate solutions.
+
     Attributes
     ----------
     path_vars: (list(int)) Indices of path vars in the solver.
@@ -523,7 +533,7 @@ class CutGenerator(cp_model.CpSolverSolutionCallback):
 
 
 class DTreeMasterProblem(BaseMasterProblem):
-    """TODO: Documentation.
+    """Master problem for Decision Tree classifier.
     """
 
     def __init__(self, initial_paths, leaves, nodes, splits,
@@ -532,9 +542,7 @@ class DTreeMasterProblem(BaseMasterProblem):
                  num_cuts_round=0,
                  solver_type='glop',
                  data_rows=None):
-        super().__init__()
-        # TODO: Switch to glop for testing.
-        self.solver_ = pywraplp.Solver.CreateSolver(solver_type)
+        super(DTreeMasterProblem, self).__init__(solver_str=solver_type)
         self.cut_gen_model_ = cp_model.CpModel()
         self.cut_obj_scale = 1000000
         self.generated_ = False
@@ -838,11 +846,6 @@ class DTreeMasterProblem(BaseMasterProblem):
                     removed_count += 1
                     # print("Rows are similar: ", r1, r2)
 
-                # if data_rows[r1].left_splits == data_rows[r2].left_splits:
-                #     data_rows[r2].removed_from_master = True
-                #     removed_count += 1
-                #     print("Rows are similar: ", r1, r2)
-
         print("Total removed rows: ", removed_count)
         return data_rows
 
@@ -1118,6 +1121,7 @@ class DTreeMasterProblem(BaseMasterProblem):
     def solve_ip(self, solver_params=''):
         """Solves the integer RMP with given solver params.
         Returns True if the tree is generated.
+
         Parameters
         ----------
         solver_params : string, default='',
@@ -1164,7 +1168,7 @@ class DTreeSubProblem(BaseSubproblem):
 
     def __init__(self, leaf, nodes, splits, targets,
                  depth, data_rows=None,
-                 optimization_problem_type='sat') -> None:
+                 solver_str='sat') -> None:
         super().__init__()
         self.leaf_id_ = leaf.id
         self.leaf_ = leaf
@@ -1172,7 +1176,7 @@ class DTreeSubProblem(BaseSubproblem):
         self.splits_ = splits
         self.targets_ = targets
         self.tree_depth_ = depth
-        self.solver_ = pywraplp.Solver.CreateSolver(optimization_problem_type)
+        self.solver_ = pywraplp.Solver.CreateSolver(solver_str)
         self.generated_ = False
         self.z_vars_ = None
         self.yc_vars_ = None
@@ -1497,6 +1501,7 @@ class DTreeSubProblem(BaseSubproblem):
 
 class PathGenerator(cp_model.CpSolverSolutionCallback):
     """Track intermediate solutions of sp.
+
     Attributes
     ----------
     TODO
@@ -1893,8 +1898,7 @@ class DTreeSubProblemSat(BaseSubproblem):
             self.create_submip(leaf_dual, row_duals, ns_duals, cut_duals)
 
         # Solve sub problem
-        sp_solver = cp_model.CpSolver()
-        sp_solver.parameters.num_search_workers = 7
+        self.cp_solver_.parameters.num_search_workers = 7
 
         # Solve
         leaf_dual = dual_costs[0][self.leaf_id_]
@@ -1904,7 +1908,8 @@ class DTreeSubProblemSat(BaseSubproblem):
                                        self.targets_,
                                        self.nodes_,
                                        self.orig_obj_coeffs)
-        status = sp_solver.Solve(self.model_, path_generator)
+        # status = self.cp_solver_.Solve(self.model_, path_generator)
+        self.solve_model(self.model_, time_limit=2, callback=path_generator)
         # print(self.leaf_id_, " Path generation status: ",
         #       sp_solver.StatusName(status))
         print(self.leaf_id_, " Path generation objective: ",
@@ -2068,7 +2073,7 @@ class DTreeSubProblemOld(BaseSubproblem):
 
     def __init__(self, leaf, nodes, splits, target,
                  depth, data_rows=None,
-                 optimization_problem_type='sat') -> None:
+                 solver_str='sat') -> None:
         super().__init__()
         self.leaf_id_ = leaf.id
         self.leaf_ = leaf
@@ -2076,7 +2081,7 @@ class DTreeSubProblemOld(BaseSubproblem):
         self.splits_ = splits
         self.target_ = target
         self.tree_depth_ = depth
-        self.solver_ = pywraplp.Solver.CreateSolver(optimization_problem_type)
+        self.solver_ = pywraplp.Solver.CreateSolver(solver_str)
         self.generated_ = False
         self.yc_vars_ = None
         self.data_rows = data_rows
@@ -2484,14 +2489,14 @@ class DTreeClassifier(ColGenClassifier):
                 for target in self.targets:
                     subproblem = DTreeSubProblemOld(
                         leaf, self.nodes, self.splits, target,
-                        self.tree_depth, optimization_problem_type='sat',
+                        self.tree_depth, solver_str='sat',
                         data_rows=data_rows)
                     self.subproblems[1].append(subproblem)
                     all_subproblem_params[1].append(subproblem_params)
             else:
                 # subproblem = DTreeSubProblem(
                 #     leaf, self.nodes, self.splits, self.targets,
-                #     self.tree_depth, optimization_problem_type='sat',
+                #     self.tree_depth, solver_str='sat',
                 #     data_rows=data_rows)
                 subproblem = DTreeSubProblemSat(
                     leaf, self.nodes, self.splits, self.targets,
