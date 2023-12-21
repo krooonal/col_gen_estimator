@@ -287,7 +287,7 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
     performed_iter_ : int
         Total number of iterations performed in column generation loop.
     num_improving_iter_ : int
-        Total number of iterations where the master problem objective was 
+        Total number of iterations where the master problem objective was
         improved. This requires the implementation of rmp_objective_improved
         method in the master problem.
     mp_optimal_: bool
