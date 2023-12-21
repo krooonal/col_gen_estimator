@@ -190,7 +190,7 @@ class BaseSubproblem():
         callback: cp_model.CpSolverSolutionCallback
             Optional callback to capture intermediate solutions.
         """
-        if self.cp_solver_ == None:
+        if self.cp_solver_ is None:
             return
 
         self.cp_solver_.parameters.num_search_workers = 7
@@ -200,10 +200,10 @@ class BaseSubproblem():
         #     'interleave_search'].get_best_value()
         self.cp_solver_.parameters.min_num_lns_workers = self.tunable_params_[
             'min_num_lns_workers'].get_best_value()
-        self.cp_solver_.parameters.cp_model_probing_level = self.tunable_params_[
-            'cp_model_probing_level'].get_best_value()
-        self.cp_solver_.parameters.max_presolve_iterations = self.tunable_params_[
-            'max_presolve_iterations'].get_best_value()
+        self.cp_solver_.parameters.cp_model_probing_level = \
+            self.tunable_params_['cp_model_probing_level'].get_best_value()
+        self.cp_solver_.parameters.max_presolve_iterations = \
+            self.tunable_params_['max_presolve_iterations'].get_best_value()
 
         # for key in self.tunable_params_:
         #     self.tunable_params_[key].print_stats()
@@ -286,12 +286,24 @@ class ColGenClassifier(ClassifierMixin, BaseEstimator):
         The classes seen at :meth:`fit`.
     performed_iter_ : int
         Total number of iterations performed in column generation loop.
-    mp_optimal: bool
+    num_improving_iter_ : int
+        Total number of iterations where the master problem objective was
+        improved. This requires the implementation of rmp_objective_improved
+        method in the master problem.
+    mp_optimal_: bool
         Set to true if none of the subproblems could generate any column in an
         iteration.
-    num_col_added_sp_: list of ints (size = number of subproblems)
+    num_col_added_sp_: list of list of ints, shape (same as of 'subproblem')
         Count of number of columns added to the master problem by each
         subproblem.
+    time_spent_sp_ : list of list of floats, shape (same as of 'subproblem')
+        Total time spent by each subproblem.
+    time_spent_master_ : float
+        Total time spent by the master problem.
+    time_add_col_ : float
+        Total time spent in adding columns to the master problem.
+    time_limit_reached_ : bool
+        Set to true if the given time limit is reached.
     """
 
     def __init__(self, max_iterations=-1,

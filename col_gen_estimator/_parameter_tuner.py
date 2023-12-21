@@ -66,7 +66,7 @@ class Parameter:
         self.explore_count_ = value
 
     def adjust_score(self, score, index=None):
-        if index == None:
+        if index is None:
             index = self.current_index_
         self.scores_[index].push(score)
         self.counts_[index] += 1
