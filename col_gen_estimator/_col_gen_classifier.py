@@ -235,11 +235,11 @@ class BaseSubproblem():
         self.gaps_.append(gap_score)
 
         # self.tunable_params_['interleave_search'].adjust_score(-total_score)
-        # self.tunable_params_['min_num_lns_workers'].adjust_score(-total_score)
-        # self.tunable_params_[
-        #     'cp_model_probing_level'].adjust_score(-total_score)
-        # self.tunable_params_[
-        #     'max_presolve_iterations'].adjust_score(-total_score)
+        self.tunable_params_['min_num_lns_workers'].adjust_score(-total_score)
+        self.tunable_params_[
+            'cp_model_probing_level'].adjust_score(-total_score)
+        self.tunable_params_[
+            'max_presolve_iterations'].adjust_score(-total_score)
 
         for key in self.tunable_params_:
             self.tunable_params_[key].adjust_score(-total_score)
